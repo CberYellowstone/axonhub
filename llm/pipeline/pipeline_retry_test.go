@@ -61,6 +61,9 @@ type mockOutbound struct {
 	nextChannel           func(context.Context) error
 	canRetry              func(error) bool
 	prepareForRetry       func(context.Context) error
+	canSpecialRetry       func(context.Context, error) bool
+	prepareSpecialRetry   func(context.Context, error) error
+	finishSpecialRetry    func(context.Context, error, error)
 	transformRequest      func(context.Context, *llm.Request) (*httpclient.Request, error)
 	transformResponse     func(context.Context, *httpclient.Response) (*llm.Response, error)
 	transformStream       func(context.Context, *httpclient.Request, streams.Stream[*httpclient.StreamEvent]) (streams.Stream[*llm.Response], error)
@@ -131,6 +134,28 @@ func (m *mockOutbound) PrepareForRetry(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (m *mockOutbound) CanSpecialRetry(ctx context.Context, err error) bool {
+	if m.canSpecialRetry != nil {
+		return m.canSpecialRetry(ctx, err)
+	}
+
+	return false
+}
+
+func (m *mockOutbound) PrepareSpecialRetry(ctx context.Context, err error) error {
+	if m.prepareSpecialRetry != nil {
+		return m.prepareSpecialRetry(ctx, err)
+	}
+
+	return nil
+}
+
+func (m *mockOutbound) FinishSpecialRetry(ctx context.Context, originalErr error, specialErr error) {
+	if m.finishSpecialRetry != nil {
+		m.finishSpecialRetry(ctx, originalErr, specialErr)
+	}
 }
 
 type mockExecutor struct {
@@ -354,6 +379,196 @@ func TestPipeline_Process_RetryLogic(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, res)
 		require.Equal(t, 4, execCalls)
+	})
+}
+
+func TestPipeline_Process_SpecialRetry(t *testing.T) {
+	ctx := context.Background()
+	inbound := &mockInbound{}
+
+	t.Run("success does not consume ordinary retry counters", func(t *testing.T) {
+		execCalls := 0
+		executor := &mockExecutor{
+			do: func(ctx context.Context, req *httpclient.Request) (*httpclient.Response, error) {
+				execCalls++
+				if execCalls == 1 {
+					return nil, errors.New("responses 400")
+				}
+
+				return &httpclient.Response{}, nil
+			},
+		}
+
+		prepareSpecialCalls := 0
+		ordinaryRetryChecks := 0
+		outbound := &mockOutbound{
+			canSpecialRetry: func(ctx context.Context, err error) bool { return true },
+			prepareSpecialRetry: func(ctx context.Context, err error) error {
+				prepareSpecialCalls++
+				return nil
+			},
+			canRetry: func(err error) bool {
+				ordinaryRetryChecks++
+				return true
+			},
+		}
+
+		p := &pipeline{
+			Executor: executor,
+			Inbound:  inbound,
+			Outbound: outbound,
+		}
+
+		res, err := p.Process(ctx, &httpclient.Request{})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, 2, execCalls)
+		require.Equal(t, 1, prepareSpecialCalls)
+		require.Zero(t, ordinaryRetryChecks)
+	})
+
+	t.Run("failure continues ordinary retry with original request body", func(t *testing.T) {
+		var bodies []string
+		execCalls := 0
+		executor := &mockExecutor{
+			do: func(ctx context.Context, req *httpclient.Request) (*httpclient.Response, error) {
+				execCalls++
+				bodies = append(bodies, string(req.Body))
+				if execCalls < 3 {
+					return nil, errors.New("fail")
+				}
+
+				return &httpclient.Response{}, nil
+			},
+		}
+
+		specialActive := false
+		prepareSpecialCalls := 0
+		prepareOrdinaryCalls := 0
+		outbound := &mockOutbound{
+			transformRequest: func(ctx context.Context, req *llm.Request) (*httpclient.Request, error) {
+				if specialActive {
+					return &httpclient.Request{Body: []byte("cleaned")}, nil
+				}
+
+				return &httpclient.Request{Body: []byte("original")}, nil
+			},
+			canSpecialRetry: func(ctx context.Context, err error) bool { return !specialActive },
+			prepareSpecialRetry: func(ctx context.Context, err error) error {
+				prepareSpecialCalls++
+				specialActive = true
+				return nil
+			},
+			finishSpecialRetry: func(ctx context.Context, originalErr error, specialErr error) {
+				specialActive = false
+			},
+			canRetry: func(err error) bool { return true },
+			prepareForRetry: func(ctx context.Context) error {
+				prepareOrdinaryCalls++
+				return nil
+			},
+		}
+
+		p := &pipeline{
+			Executor:              executor,
+			Inbound:               inbound,
+			Outbound:              outbound,
+			maxSameChannelRetries: 1,
+		}
+
+		res, err := p.Process(ctx, &httpclient.Request{})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, []string{"original", "cleaned", "original"}, bodies)
+		require.Equal(t, 1, prepareSpecialCalls)
+		require.Equal(t, 1, prepareOrdinaryCalls)
+	})
+
+	t.Run("later channel can trigger special retry again", func(t *testing.T) {
+		execCalls := 0
+		executor := &mockExecutor{
+			do: func(ctx context.Context, req *httpclient.Request) (*httpclient.Response, error) {
+				execCalls++
+				if execCalls < 4 {
+					return nil, errors.New("responses 400")
+				}
+
+				return &httpclient.Response{}, nil
+			},
+		}
+
+		specialActive := false
+		currentChannel := 0
+		prepareSpecialCalls := 0
+		switchCalls := 0
+		outbound := &mockOutbound{
+			canSpecialRetry: func(ctx context.Context, err error) bool { return !specialActive },
+			prepareSpecialRetry: func(ctx context.Context, err error) error {
+				prepareSpecialCalls++
+				specialActive = true
+				return nil
+			},
+			finishSpecialRetry: func(ctx context.Context, originalErr error, specialErr error) {
+				specialActive = false
+			},
+			canRetry:        func(err error) bool { return false },
+			hasMoreChannels: func() bool { return currentChannel == 0 },
+			nextChannel: func(ctx context.Context) error {
+				switchCalls++
+				currentChannel++
+				return nil
+			},
+		}
+
+		p := &pipeline{
+			Executor:          executor,
+			Inbound:           inbound,
+			Outbound:          outbound,
+			maxChannelRetries: 1,
+		}
+
+		res, err := p.Process(ctx, &httpclient.Request{})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, 4, execCalls)
+		require.Equal(t, 2, prepareSpecialCalls)
+		require.Equal(t, 1, switchCalls)
+	})
+
+	t.Run("special attempt does not recursively trigger another special retry", func(t *testing.T) {
+		execCalls := 0
+		executor := &mockExecutor{
+			do: func(ctx context.Context, req *httpclient.Request) (*httpclient.Response, error) {
+				execCalls++
+				return nil, errors.New("responses 400")
+			},
+		}
+
+		specialActive := false
+		prepareSpecialCalls := 0
+		outbound := &mockOutbound{
+			canSpecialRetry: func(ctx context.Context, err error) bool { return !specialActive },
+			prepareSpecialRetry: func(ctx context.Context, err error) error {
+				prepareSpecialCalls++
+				specialActive = true
+				return nil
+			},
+			finishSpecialRetry: func(ctx context.Context, originalErr error, specialErr error) {
+				specialActive = false
+			},
+		}
+
+		p := &pipeline{
+			Executor: executor,
+			Inbound:  inbound,
+			Outbound: outbound,
+		}
+
+		res, err := p.Process(ctx, &httpclient.Request{})
+		require.Error(t, err)
+		require.Nil(t, res)
+		require.Equal(t, 2, execCalls)
+		require.Equal(t, 1, prepareSpecialCalls)
 	})
 }
 

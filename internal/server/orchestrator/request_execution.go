@@ -89,6 +89,11 @@ func (m *persistRequestExecutionMiddleware) OnOutboundRawRequest(ctx context.Con
 		format = llm.APIFormat(request.APIFormat)
 	}
 
+	attemptType := biz.RequestExecutionAttemptTypeNormal
+	if state.SpecialRetryActive && state.SpecialRetryType == specialRetryTypeEncryptedContentCleanupSameChannel {
+		attemptType = biz.RequestExecutionAttemptTypeEncryptedContentCleanup
+	}
+
 	requestExec, err := state.RequestService.CreateRequestExecution(
 		ctx,
 		channel,
@@ -97,6 +102,7 @@ func (m *persistRequestExecutionMiddleware) OnOutboundRawRequest(ctx context.Con
 		*request,
 		format,
 		state.PassThroughApplied,
+		attemptType,
 	)
 	if err != nil {
 		return nil, err

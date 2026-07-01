@@ -17,8 +17,10 @@ import (
 	"github.com/looplj/axonhub/internal/ent/channel"
 	"github.com/looplj/axonhub/internal/ent/enttest"
 	"github.com/looplj/axonhub/internal/ent/request"
+	"github.com/looplj/axonhub/internal/ent/requestexecution"
 	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/server/biz"
+	"github.com/looplj/axonhub/llm"
 	"github.com/looplj/axonhub/llm/httpclient"
 	"github.com/looplj/axonhub/llm/pipeline"
 	"github.com/looplj/axonhub/llm/pipeline/stream"
@@ -26,6 +28,7 @@ import (
 	anthropictransformer "github.com/looplj/axonhub/llm/transformer/anthropic"
 	geminitransformer "github.com/looplj/axonhub/llm/transformer/gemini"
 	"github.com/looplj/axonhub/llm/transformer/openai"
+	responsestransformer "github.com/looplj/axonhub/llm/transformer/openai/responses"
 )
 
 func TestChatCompletionOrchestrator_Process_NonStreaming_PreservesGeminiGroundingAnnotations(t *testing.T) {
@@ -845,6 +848,187 @@ func (e *sequenceExecutor) Do(ctx context.Context, request *httpclient.Request) 
 
 func (e *sequenceExecutor) DoStream(ctx context.Context, request *httpclient.Request) (streams.Stream[*httpclient.StreamEvent], error) {
 	return nil, errors.New("streaming not supported by this executor")
+}
+
+func TestChatCompletionOrchestrator_Process_EncryptedContentCleanupRetryChain(t *testing.T) {
+	ctx := context.Background()
+	ctx = authz.WithTestBypass(ctx)
+
+	client := enttest.NewEntClient(t, "sqlite3", "file:ent?mode=memory&_fk=0")
+	defer client.Close()
+
+	ctx = ent.NewContext(ctx, client)
+
+	project := createTestProject(t, ctx, client)
+	channelA := createResponsesCleanupRetryTestChannel(t, ctx, client, "Responses A")
+	channelB := createResponsesCleanupRetryTestChannel(t, ctx, client, "Responses B")
+	channelService, requestService, systemService, usageLogService := setupTestServices(t, client)
+
+	err := systemService.SetRetryPolicy(ctx, &biz.RetryPolicy{
+		Enabled:                             true,
+		EncryptedContentCleanupRetryEnabled: true,
+		MaxChannelRetries:                   1,
+		MaxSingleChannelRetries:             0,
+		RetryDelayMs:                        0,
+		LoadBalancerStrategy:                "adaptive",
+	})
+	require.NoError(t, err)
+
+	successBody := []byte(`{
+		"id":"resp_cleanup_success",
+		"object":"response",
+		"created_at":1759161016,
+		"status":"completed",
+		"model":"gpt-5.5",
+		"output":[{
+			"id":"msg_123",
+			"type":"message",
+			"status":"completed",
+			"content":[{"type":"output_text","text":"Recovered"}],
+			"role":"assistant"
+		}],
+		"usage":{"input_tokens":10,"output_tokens":20,"total_tokens":30}
+	}`)
+	executor := &sequenceExecutor{
+		steps: []executorStep{
+			{
+				err: &httpclient.Error{
+					StatusCode: http.StatusBadRequest,
+					Status:     http.StatusText(http.StatusBadRequest),
+					Body:       []byte(`{"error":{"message":"invalid request: failed to decode responses api request: invalid input: invalid request"}}`),
+				},
+			},
+			{
+				err: &httpclient.Error{
+					StatusCode: http.StatusBadRequest,
+					Status:     http.StatusText(http.StatusBadRequest),
+					Body:       []byte(`{"error":{"message":"still invalid after cleanup"}}`),
+				},
+			},
+			{
+				err: &httpclient.Error{
+					StatusCode: http.StatusBadRequest,
+					Status:     http.StatusText(http.StatusBadRequest),
+					Body:       []byte(`{"error":{"message":"invalid request: failed to decode responses api request: invalid input: invalid request"}}`),
+				},
+			},
+			{
+				resp: &httpclient.Response{
+					StatusCode: http.StatusOK,
+					Body:       successBody,
+					Headers:    http.Header{"Content-Type": []string{"application/json"}},
+				},
+			},
+		},
+	}
+
+	outboundA, err := responsestransformer.NewOutboundTransformer(channelA.BaseURL, channelA.Credentials.APIKey)
+	require.NoError(t, err)
+	outboundB, err := responsestransformer.NewOutboundTransformer(channelB.BaseURL, channelB.Credentials.APIKey)
+	require.NoError(t, err)
+
+	bizChannelA := &biz.Channel{Channel: channelA, Outbound: outboundA}
+	bizChannelB := &biz.Channel{Channel: channelB, Outbound: outboundB}
+	channelSelector := &staticChannelSelector{
+		candidates: []*ChannelModelsCandidate{
+			{
+				Channel:   bizChannelA,
+				Priority:  0,
+				APIFormat: string(llm.APIFormatOpenAIResponse),
+				Models: []biz.ChannelModelEntry{
+					{RequestModel: "gpt-5.5", ActualModel: "gpt-5.5"},
+				},
+			},
+			{
+				Channel:   bizChannelB,
+				Priority:  1,
+				APIFormat: string(llm.APIFormatOpenAIResponse),
+				Models: []biz.ChannelModelEntry{
+					{RequestModel: "gpt-5.5", ActualModel: "gpt-5.5"},
+				},
+			},
+		},
+	}
+
+	orchestrator := &ChatCompletionOrchestrator{
+		channelSelector:       channelSelector,
+		Inbound:               responsestransformer.NewInboundTransformer(),
+		RequestService:        requestService,
+		ChannelService:        channelService,
+		PromptProvider:        &stubPromptProvider{},
+		SystemService:         systemService,
+		UsageLogService:       usageLogService,
+		PipelineFactory:       pipeline.NewFactory(executor),
+		ModelMapper:           NewModelMapper(),
+		channelLimiterManager: NewChannelLimiterManager(),
+		Middlewares: []pipeline.Middleware{
+			stream.EnsureUsage(),
+		},
+	}
+
+	httpRequest := buildResponsesCleanupRetryTestRequest()
+	ctx = contexts.WithProjectID(ctx, project.ID)
+
+	result, err := orchestrator.Process(ctx, httpRequest)
+	require.NoError(t, err)
+	require.NotNil(t, result.ChatCompletion)
+	require.Len(t, executor.requests, 4)
+	require.Contains(t, string(executor.requests[0].Body), "encrypted_content")
+	require.NotContains(t, string(executor.requests[1].Body), "encrypted_content")
+	require.Contains(t, string(executor.requests[2].Body), "encrypted_content")
+	require.NotContains(t, string(executor.requests[3].Body), "encrypted_content")
+
+	executions, err := client.RequestExecution.Query().
+		Order(ent.Asc(requestexecution.FieldID)).
+		All(ctx)
+	require.NoError(t, err)
+	require.Len(t, executions, 4)
+	require.Equal(t, requestexecution.AttemptTypeNormal, executions[0].AttemptType)
+	require.Equal(t, requestexecution.AttemptTypeEncryptedContentCleanup, executions[1].AttemptType)
+	require.Equal(t, requestexecution.AttemptTypeNormal, executions[2].AttemptType)
+	require.Equal(t, requestexecution.AttemptTypeEncryptedContentCleanup, executions[3].AttemptType)
+	require.Contains(t, string(executions[0].RequestBody), "encrypted_content")
+	require.NotContains(t, string(executions[1].RequestBody), "encrypted_content")
+	require.Contains(t, string(executions[2].RequestBody), "encrypted_content")
+	require.NotContains(t, string(executions[3].RequestBody), "encrypted_content")
+}
+
+func createResponsesCleanupRetryTestChannel(t *testing.T, ctx context.Context, client *ent.Client, name string) *ent.Channel {
+	t.Helper()
+
+	ch, err := client.Channel.Create().
+		SetType(channel.TypeOpenai).
+		SetName(name).
+		SetBaseURL("https://api.openai.com/v1").
+		SetCredentials(objects.ChannelCredentials{APIKey: "test-api-key"}).
+		SetSettings(&objects.ChannelSettings{PassThroughBody: lo.ToPtr(true)}).
+		SetSupportedModels([]string{"gpt-5.5"}).
+		SetDefaultTestModel("gpt-5.5").
+		Save(ctx)
+	require.NoError(t, err)
+
+	return ch
+}
+
+func buildResponsesCleanupRetryTestRequest() *httpclient.Request {
+	body := []byte(`{
+		"model":"gpt-5.5",
+		"input":[
+			{"type":"reasoning","encrypted_content":"stale","reasoning_signature":"sig"},
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}
+		],
+		"stream":false
+	}`)
+
+	return &httpclient.Request{
+		Method:    http.MethodPost,
+		URL:       "/v1/responses",
+		APIFormat: string(llm.APIFormatOpenAIResponse),
+		Headers: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: body,
+	}
 }
 
 func TestChatCompletionOrchestrator_Process_SameChannelRetryNextModel(t *testing.T) {

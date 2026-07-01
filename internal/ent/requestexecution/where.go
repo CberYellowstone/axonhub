@@ -545,6 +545,26 @@ func FormatContainsFold(v string) predicate.RequestExecution {
 	return predicate.RequestExecution(sql.FieldContainsFold(FieldFormat, v))
 }
 
+// AttemptTypeEQ applies the EQ predicate on the "attempt_type" field.
+func AttemptTypeEQ(v AttemptType) predicate.RequestExecution {
+	return predicate.RequestExecution(sql.FieldEQ(FieldAttemptType, v))
+}
+
+// AttemptTypeNEQ applies the NEQ predicate on the "attempt_type" field.
+func AttemptTypeNEQ(v AttemptType) predicate.RequestExecution {
+	return predicate.RequestExecution(sql.FieldNEQ(FieldAttemptType, v))
+}
+
+// AttemptTypeIn applies the In predicate on the "attempt_type" field.
+func AttemptTypeIn(vs ...AttemptType) predicate.RequestExecution {
+	return predicate.RequestExecution(sql.FieldIn(FieldAttemptType, vs...))
+}
+
+// AttemptTypeNotIn applies the NotIn predicate on the "attempt_type" field.
+func AttemptTypeNotIn(vs ...AttemptType) predicate.RequestExecution {
+	return predicate.RequestExecution(sql.FieldNotIn(FieldAttemptType, vs...))
+}
+
 // ResponseBodyIsNil applies the IsNil predicate on the "response_body" field.
 func ResponseBodyIsNil() predicate.RequestExecution {
 	return predicate.RequestExecution(sql.FieldIsNull(FieldResponseBody))

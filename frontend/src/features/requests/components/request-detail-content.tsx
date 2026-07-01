@@ -729,21 +729,31 @@ export function RequestDetailContent({ requestId, projectId, previewRequest, isP
                     return (
                       <Card key={execution.id} className='bg-muted/20 border-0 shadow-sm'>
                         <CardHeader className='pb-4'>
-                          <div className='flex items-center justify-between'>
+                          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                             <h5 className='flex items-center gap-2 text-base font-semibold'>
                               <div className='bg-primary/10 text-primary flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold'>
                                 {index + 1}
                               </div>
                               {t('requests.dialogs.requestDetail.execution', { index: index + 1 })}
                             </h5>
-                            <Badge className={getStatusColor(execution.status)} variant='secondary'>
-                              {t(`requests.status.${execution.status}`)}
-                            </Badge>
-                            {execution.passThroughApplied && (
-                              <Badge className='border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'>
-                                {t('requests.passThrough.applied')}
+                            <div className='flex flex-wrap items-center gap-2 sm:justify-end'>
+                              <Badge className={getStatusColor(execution.status)} variant='secondary'>
+                                {t(`requests.status.${execution.status}`)}
                               </Badge>
-                            )}
+                              {execution.attemptType === 'encrypted_content_cleanup' && (
+                                <Badge
+                                  variant='outline'
+                                  className='border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300'
+                                >
+                                  {t('requests.execution.attemptType.encryptedContentCleanup')}
+                                </Badge>
+                              )}
+                              {execution.passThroughApplied && (
+                                <Badge className='border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300'>
+                                  {t('requests.passThrough.applied')}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className='space-y-6'>

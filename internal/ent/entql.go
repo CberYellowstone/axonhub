@@ -418,6 +418,7 @@ var schemaGraph = func() *sqlgraph.Schema {
 			requestexecution.FieldExternalID:                 {Type: field.TypeString, Column: requestexecution.FieldExternalID},
 			requestexecution.FieldModelID:                    {Type: field.TypeString, Column: requestexecution.FieldModelID},
 			requestexecution.FieldFormat:                     {Type: field.TypeString, Column: requestexecution.FieldFormat},
+			requestexecution.FieldAttemptType:                {Type: field.TypeEnum, Column: requestexecution.FieldAttemptType},
 			requestexecution.FieldRequestBody:                {Type: field.TypeJSON, Column: requestexecution.FieldRequestBody},
 			requestexecution.FieldResponseBody:               {Type: field.TypeJSON, Column: requestexecution.FieldResponseBody},
 			requestexecution.FieldResponseChunks:             {Type: field.TypeJSON, Column: requestexecution.FieldResponseChunks},
@@ -3383,6 +3384,11 @@ func (f *RequestExecutionFilter) WhereModelID(p entql.StringP) {
 // WhereFormat applies the entql string predicate on the format field.
 func (f *RequestExecutionFilter) WhereFormat(p entql.StringP) {
 	f.Where(p.Field(requestexecution.FieldFormat))
+}
+
+// WhereAttemptType applies the entql string predicate on the attempt_type field.
+func (f *RequestExecutionFilter) WhereAttemptType(p entql.StringP) {
+	f.Where(p.Field(requestexecution.FieldAttemptType))
 }
 
 // WhereRequestBody applies the entql json.RawMessage predicate on the request_body field.

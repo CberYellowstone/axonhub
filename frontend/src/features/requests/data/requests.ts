@@ -67,8 +67,11 @@ function buildRequestsQuery(permissions: { canViewApiKeys: boolean; canViewChann
             executions(first: 10, orderBy: { field: CREATED_AT, direction: DESC }) {
               edges {
                 node {
+                  id
+                  createdAt
                   modelID
                   status
+                  attemptType
                   passThroughApplied${executionChannelFields}
                 }
                 cursor
@@ -246,6 +249,7 @@ function buildRequestExecutionsQuery(permissions: { canViewChannels: boolean }) 
                 errorMessage
                 responseStatusCode
                 status
+                attemptType
                 format
                 stream
                 requestURL

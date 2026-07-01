@@ -358,11 +358,19 @@ export function useRequestsColumns(options?: UseRequestsColumnsOptions): ColumnD
                           {sortedExecutions.map((exe, idx) => (
                             <div
                               key={exe.id || idx}
-                              className='hover:bg-muted/50 flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors'
+                              className='hover:bg-muted/50 flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 transition-colors'
                             >
                               <Badge className={`${getStatusColor(exe.status || '')} h-5 shrink-0 px-1.5 text-[10px] font-bold uppercase`}>
                                 {t(`requests.status.${exe.status}`)}
                               </Badge>
+                              {exe.attemptType === 'encrypted_content_cleanup' && (
+                                <Badge
+                                  variant='outline'
+                                  className='h-5 shrink-0 border-cyan-200 bg-cyan-50 px-1.5 text-[10px] font-semibold text-cyan-700 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300'
+                                >
+                                  {t('requests.execution.attemptType.encryptedContentCleanupShort')}
+                                </Badge>
+                              )}
                               <div className='flex min-w-0 flex-col'>
                                 <span className='text-foreground truncate text-xs font-semibold'>
                                   {exe.channel?.name || t('requests.columns.unknown')}

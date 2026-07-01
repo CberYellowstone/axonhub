@@ -7604,6 +7604,12 @@ type RequestExecutionWhereInput struct {
 	FormatEqualFold    *string  `json:"formatEqualFold,omitempty"`
 	FormatContainsFold *string  `json:"formatContainsFold,omitempty"`
 
+	// "attempt_type" field predicates.
+	AttemptType      *requestexecution.AttemptType  `json:"attemptType,omitempty"`
+	AttemptTypeNEQ   *requestexecution.AttemptType  `json:"attemptTypeNEQ,omitempty"`
+	AttemptTypeIn    []requestexecution.AttemptType `json:"attemptTypeIn,omitempty"`
+	AttemptTypeNotIn []requestexecution.AttemptType `json:"attemptTypeNotIn,omitempty"`
+
 	// "error_message" field predicates.
 	ErrorMessage             *string  `json:"errorMessage,omitempty"`
 	ErrorMessageNEQ          *string  `json:"errorMessageNEQ,omitempty"`
@@ -8050,6 +8056,18 @@ func (i *RequestExecutionWhereInput) P() (predicate.RequestExecution, error) {
 	}
 	if i.FormatContainsFold != nil {
 		predicates = append(predicates, requestexecution.FormatContainsFold(*i.FormatContainsFold))
+	}
+	if i.AttemptType != nil {
+		predicates = append(predicates, requestexecution.AttemptTypeEQ(*i.AttemptType))
+	}
+	if i.AttemptTypeNEQ != nil {
+		predicates = append(predicates, requestexecution.AttemptTypeNEQ(*i.AttemptTypeNEQ))
+	}
+	if len(i.AttemptTypeIn) > 0 {
+		predicates = append(predicates, requestexecution.AttemptTypeIn(i.AttemptTypeIn...))
+	}
+	if len(i.AttemptTypeNotIn) > 0 {
+		predicates = append(predicates, requestexecution.AttemptTypeNotIn(i.AttemptTypeNotIn...))
 	}
 	if i.ErrorMessage != nil {
 		predicates = append(predicates, requestexecution.ErrorMessageEQ(*i.ErrorMessage))

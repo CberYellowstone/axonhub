@@ -81,4 +81,13 @@ type PersistenceState struct {
 
 	// PassThroughApplied records whether the inbound request body was substituted during pass-through.
 	PassThroughApplied bool
+
+	// SpecialRetryActive marks the current attempt as a special retry attempt.
+	SpecialRetryActive bool
+	// SpecialRetryType describes the active special retry strategy.
+	SpecialRetryType string
+	// SpecialRetryTriggerStatus records the status that triggered the special retry.
+	SpecialRetryTriggerStatus int
+	// SpecialRetryTriggerMessage records the error text that triggered the special retry.
+	SpecialRetryTriggerMessage string
 }

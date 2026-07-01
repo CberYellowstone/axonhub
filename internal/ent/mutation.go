@@ -17649,6 +17649,7 @@ type RequestExecutionMutation struct {
 	external_id                       *string
 	model_id                          *string
 	format                            *string
+	attempt_type                      *requestexecution.AttemptType
 	request_body                      *objects.JSONRawMessage
 	appendrequest_body                objects.JSONRawMessage
 	response_body                     *objects.JSONRawMessage
@@ -18161,6 +18162,42 @@ func (m *RequestExecutionMutation) OldFormat(ctx context.Context) (v string, err
 // ResetFormat resets all changes to the "format" field.
 func (m *RequestExecutionMutation) ResetFormat() {
 	m.format = nil
+}
+
+// SetAttemptType sets the "attempt_type" field.
+func (m *RequestExecutionMutation) SetAttemptType(rt requestexecution.AttemptType) {
+	m.attempt_type = &rt
+}
+
+// AttemptType returns the value of the "attempt_type" field in the mutation.
+func (m *RequestExecutionMutation) AttemptType() (r requestexecution.AttemptType, exists bool) {
+	v := m.attempt_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttemptType returns the old "attempt_type" field's value of the RequestExecution entity.
+// If the RequestExecution object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RequestExecutionMutation) OldAttemptType(ctx context.Context) (v requestexecution.AttemptType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttemptType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttemptType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttemptType: %w", err)
+	}
+	return oldValue.AttemptType, nil
+}
+
+// ResetAttemptType resets all changes to the "attempt_type" field.
+func (m *RequestExecutionMutation) ResetAttemptType() {
+	m.attempt_type = nil
 }
 
 // SetRequestBody sets the "request_body" field.
@@ -19010,7 +19047,7 @@ func (m *RequestExecutionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RequestExecutionMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 23)
 	if m.created_at != nil {
 		fields = append(fields, requestexecution.FieldCreatedAt)
 	}
@@ -19037,6 +19074,9 @@ func (m *RequestExecutionMutation) Fields() []string {
 	}
 	if m.format != nil {
 		fields = append(fields, requestexecution.FieldFormat)
+	}
+	if m.attempt_type != nil {
+		fields = append(fields, requestexecution.FieldAttemptType)
 	}
 	if m.request_body != nil {
 		fields = append(fields, requestexecution.FieldRequestBody)
@@ -19103,6 +19143,8 @@ func (m *RequestExecutionMutation) Field(name string) (ent.Value, bool) {
 		return m.ModelID()
 	case requestexecution.FieldFormat:
 		return m.Format()
+	case requestexecution.FieldAttemptType:
+		return m.AttemptType()
 	case requestexecution.FieldRequestBody:
 		return m.RequestBody()
 	case requestexecution.FieldResponseBody:
@@ -19156,6 +19198,8 @@ func (m *RequestExecutionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldModelID(ctx)
 	case requestexecution.FieldFormat:
 		return m.OldFormat(ctx)
+	case requestexecution.FieldAttemptType:
+		return m.OldAttemptType(ctx)
 	case requestexecution.FieldRequestBody:
 		return m.OldRequestBody(ctx)
 	case requestexecution.FieldResponseBody:
@@ -19253,6 +19297,13 @@ func (m *RequestExecutionMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFormat(v)
+		return nil
+	case requestexecution.FieldAttemptType:
+		v, ok := value.(requestexecution.AttemptType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttemptType(v)
 		return nil
 	case requestexecution.FieldRequestBody:
 		v, ok := value.(objects.JSONRawMessage)
@@ -19558,6 +19609,9 @@ func (m *RequestExecutionMutation) ResetField(name string) error {
 		return nil
 	case requestexecution.FieldFormat:
 		m.ResetFormat()
+		return nil
+	case requestexecution.FieldAttemptType:
+		m.ResetAttemptType()
 		return nil
 	case requestexecution.FieldRequestBody:
 		m.ResetRequestBody()

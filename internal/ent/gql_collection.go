@@ -4103,6 +4103,11 @@ func (_q *RequestExecutionQuery) collectField(ctx context.Context, oneNode bool,
 				selectedFields = append(selectedFields, requestexecution.FieldFormat)
 				fieldSeen[requestexecution.FieldFormat] = struct{}{}
 			}
+		case "attemptType":
+			if _, ok := fieldSeen[requestexecution.FieldAttemptType]; !ok {
+				selectedFields = append(selectedFields, requestexecution.FieldAttemptType)
+				fieldSeen[requestexecution.FieldAttemptType] = struct{}{}
+			}
 		case "requestBody":
 			if _, ok := fieldSeen[requestexecution.FieldRequestBody]; !ok {
 				selectedFields = append(selectedFields, requestexecution.FieldRequestBody)

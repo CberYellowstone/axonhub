@@ -27,6 +27,7 @@ export function RetrySettings() {
     nonStreamResponseTimeoutSeconds: 0,
     loadBalancerStrategy: 'adaptive',
     emptyResponseDetection: false,
+    encryptedContentCleanupRetryEnabled: true,
     upstreamErrorPolicy: {
       mode: 'passthrough',
       customMessage: '',
@@ -48,6 +49,7 @@ export function RetrySettings() {
         nonStreamResponseTimeoutSeconds: retryPolicy.nonStreamResponseTimeoutSeconds,
         loadBalancerStrategy: retryPolicy.loadBalancerStrategy,
         emptyResponseDetection: retryPolicy.emptyResponseDetection,
+        encryptedContentCleanupRetryEnabled: retryPolicy.encryptedContentCleanupRetryEnabled ?? true,
         upstreamErrorPolicy: {
           mode: retryPolicy.upstreamErrorPolicy?.mode || 'passthrough',
           customMessage: retryPolicy.upstreamErrorPolicy?.customMessage || '',
@@ -317,6 +319,23 @@ export function RetrySettings() {
                   id='empty-response-detection'
                   checked={formData.emptyResponseDetection || false}
                   onCheckedChange={(checked) => handleInputChange('emptyResponseDetection', checked)}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Encrypted Content Cleanup Retry */}
+              <div className='flex items-center justify-between gap-4'>
+                <div className='space-y-0.5'>
+                  <Label htmlFor='encrypted-content-cleanup-retry' className='text-base'>
+                    {t('system.retry.encryptedContentCleanupRetry.label')}
+                  </Label>
+                  <div className='text-muted-foreground text-sm'>{t('system.retry.encryptedContentCleanupRetry.description')}</div>
+                </div>
+                <Switch
+                  id='encrypted-content-cleanup-retry'
+                  checked={formData.encryptedContentCleanupRetryEnabled ?? true}
+                  onCheckedChange={(checked) => handleInputChange('encryptedContentCleanupRetryEnabled', checked)}
                 />
               </div>
 

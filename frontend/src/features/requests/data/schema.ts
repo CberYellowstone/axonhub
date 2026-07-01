@@ -16,6 +16,10 @@ export type RequestSource = z.infer<typeof requestSourceSchema>;
 export const requestExecutionStatusSchema = z.enum(['pending', 'processing', 'completed', 'failed', 'canceled']);
 export type RequestExecutionStatus = z.infer<typeof requestExecutionStatusSchema>;
 
+// Request Execution Attempt Type
+export const requestExecutionAttemptTypeSchema = z.enum(['normal', 'encrypted_content_cleanup']).catch('normal');
+export type RequestExecutionAttemptType = z.infer<typeof requestExecutionAttemptTypeSchema>;
+
 // Request Execution
 export const requestExecutionSchema = z.object({
   id: z.string(),
@@ -33,6 +37,7 @@ export const requestExecutionSchema = z.object({
   errorMessage: z.string().nullable(),
   responseStatusCode: z.number().nullable().optional(),
   status: requestExecutionStatusSchema,
+  attemptType: requestExecutionAttemptTypeSchema,
   format: z.string().optional(),
   metricsLatencyMs: z.number().nullable().optional(),
   metricsFirstTokenLatencyMs: z.number().nullable().optional(),

@@ -38,6 +38,8 @@
   "requests.columns.executedModelId": "执行模型ID",
   "requests.columns.retryProcess": "重试过程",
   "requests.columns.mappedModel": "映射模型",
+  "requests.execution.attemptType.encryptedContentCleanup": "加密内容清理重试",
+  "requests.execution.attemptType.encryptedContentCleanupShort": "清理",
   "requests.status.pending": "等待中",
   "requests.status.processing": "处理中",
   "requests.status.completed": "已完成",

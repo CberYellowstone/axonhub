@@ -57,8 +57,8 @@ func (r *mutationResolver) UpdateStoragePolicy(ctx context.Context, input biz.St
 }
 
 // UpdateRetryPolicy is the resolver for the updateRetryPolicy field.
-func (r *mutationResolver) UpdateRetryPolicy(ctx context.Context, input biz.RetryPolicy) (bool, error) {
-	err := r.systemService.SetRetryPolicy(ctx, &input)
+func (r *mutationResolver) UpdateRetryPolicy(ctx context.Context, input biz.UpdateRetryPolicyInput) (bool, error) {
+	err := r.systemService.UpdateRetryPolicy(ctx, &input)
 	if err != nil {
 		return false, fmt.Errorf("failed to update retry policy: %w", err)
 	}

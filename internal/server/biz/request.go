@@ -37,6 +37,11 @@ type RequestService struct {
 	channelCache       xcache.Cache[int]
 }
 
+const (
+	RequestExecutionAttemptTypeNormal                  = "normal"
+	RequestExecutionAttemptTypeEncryptedContentCleanup = "encrypted_content_cleanup"
+)
+
 // NewRequestService creates a new RequestService.
 func NewRequestService(ent *ent.Client, systemService *SystemService, usageLogService *UsageLogService, dataStorageService *DataStorageService, liveStreamRegistry *LiveStreamRegistry) *RequestService {
 	return &RequestService{
@@ -262,7 +267,10 @@ func (s *RequestService) CreateRequestExecution(
 	channelRequest httpclient.Request,
 	format llm.APIFormat,
 	passThroughApplied bool,
+	attemptType string,
 ) (*ent.RequestExecution, error) {
+	attemptType = normalizeRequestExecutionAttemptType(attemptType)
+
 	// Decide whether to store the channel request body
 	storeRequestBody := true
 	if policy, err := s.SystemService.StoragePolicy(ctx); err == nil {
@@ -330,7 +338,8 @@ func (s *RequestService) CreateRequestExecution(
 		SetStatus(requestexecution.StatusProcessing).
 		SetStream(request.Stream).
 		SetRequestHeaders(requestHeadersBytes).
-		SetPassThroughApplied(passThroughApplied)
+		SetPassThroughApplied(passThroughApplied).
+		SetAttemptType(requestexecution.AttemptType(attemptType))
 
 	if channelRequest.URL != "" {
 		mut = mut.SetRequestURL(channelRequest.URL)
@@ -370,6 +379,15 @@ func (s *RequestService) CreateRequestExecution(
 	}
 
 	return execution, nil
+}
+
+func normalizeRequestExecutionAttemptType(attemptType string) string {
+	switch attemptType {
+	case RequestExecutionAttemptTypeEncryptedContentCleanup:
+		return attemptType
+	default:
+		return RequestExecutionAttemptTypeNormal
+	}
 }
 
 // LatencyMetrics holds latency metrics for a request.

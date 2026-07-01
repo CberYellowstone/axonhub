@@ -4576,6 +4576,7 @@ type RequestExecution implements Node {
   externalID: String
   modelID: String!
   format: String!
+  attemptType: RequestExecutionAttemptType!
   requestBody: JSONRawMessage! @goField(forceResolver: true)
   responseBody: JSONRawMessage @goField(forceResolver: true)
   responseChunks: [JSONRawMessage!] @goField(forceResolver: true)
@@ -4607,6 +4608,13 @@ type RequestExecution implements Node {
   request: Request!
   channel: Channel @goField(forceResolver: true)
   dataStorage: DataStorage
+}
+"""
+RequestExecutionAttemptType is enum for the field attempt_type
+"""
+enum RequestExecutionAttemptType @goModel(model: "github.com/looplj/axonhub/internal/ent/requestexecution.AttemptType") {
+  normal
+  encrypted_content_cleanup
 }
 """
 A connection to a list of items.
@@ -4795,6 +4803,13 @@ input RequestExecutionWhereInput {
   formatHasSuffix: String
   formatEqualFold: String
   formatContainsFold: String
+  """
+  attempt_type field predicates
+  """
+  attemptType: RequestExecutionAttemptType
+  attemptTypeNEQ: RequestExecutionAttemptType
+  attemptTypeIn: [RequestExecutionAttemptType!]
+  attemptTypeNotIn: [RequestExecutionAttemptType!]
   """
   error_message field predicates
   """

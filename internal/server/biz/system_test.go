@@ -557,6 +557,102 @@ func TestSystemService_BackwardCompatibility(t *testing.T) {
 	require.Len(t, policy.CleanupOptions, 1)
 }
 
+func TestSystemService_RetryPolicy_BackfillsEncryptedContentCleanupRetry(t *testing.T) {
+	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
+
+	service, client := setupTestSystemService(t, cacheConfig)
+	defer client.Close()
+
+	ctx := context.Background()
+	ctx = ent.NewContext(ctx, client)
+	ctx = authz.WithTestBypass(ctx)
+
+	oldPolicy := map[string]any{
+		"enabled":                             true,
+		"max_channel_retries":                 3,
+		"max_single_channel_retries":          2,
+		"retry_delay_ms":                      1000,
+		"stream_first_event_timeout_seconds":  0,
+		"non_stream_response_timeout_seconds": 0,
+		"load_balancer_strategy":              "adaptive",
+		"empty_response_detection":            false,
+		"upstream_error_policy": map[string]any{
+			"mode":           UpstreamErrorModePassthrough,
+			"custom_message": "",
+		},
+	}
+
+	oldPolicyJSON, err := json.Marshal(oldPolicy)
+	require.NoError(t, err)
+
+	_, err = client.System.Create().
+		SetKey(SystemKeyRetryPolicy).
+		SetValue(string(oldPolicyJSON)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	policy, err := service.RetryPolicy(ctx)
+	require.NoError(t, err)
+	require.True(t, policy.Enabled)
+	require.True(t, policy.EncryptedContentCleanupRetryEnabled)
+}
+
+func TestSystemService_UpdateRetryPolicy_PreservesOmittedEncryptedContentCleanupRetry(t *testing.T) {
+	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
+
+	service, client := setupTestSystemService(t, cacheConfig)
+	defer client.Close()
+
+	ctx := context.Background()
+	ctx = ent.NewContext(ctx, client)
+	ctx = authz.WithTestBypass(ctx)
+
+	err := service.SetRetryPolicy(ctx, &RetryPolicy{
+		Enabled:                             true,
+		EncryptedContentCleanupRetryEnabled: true,
+		MaxChannelRetries:                   3,
+		MaxSingleChannelRetries:             2,
+		RetryDelayMs:                        1000,
+		LoadBalancerStrategy:                LoadBalancerStrategyAdaptive,
+		UpstreamErrorPolicy: UpstreamErrorPolicy{
+			Mode: UpstreamErrorModePassthrough,
+		},
+	})
+	require.NoError(t, err)
+
+	enabled := false
+	err = service.UpdateRetryPolicy(ctx, &UpdateRetryPolicyInput{
+		Enabled: &enabled,
+	})
+	require.NoError(t, err)
+
+	policy, err := service.RetryPolicy(ctx)
+	require.NoError(t, err)
+	require.False(t, policy.Enabled)
+	require.True(t, policy.EncryptedContentCleanupRetryEnabled)
+}
+
+func TestSystemService_UpdateRetryPolicy_SavesExplicitEncryptedContentCleanupRetryFalse(t *testing.T) {
+	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
+
+	service, client := setupTestSystemService(t, cacheConfig)
+	defer client.Close()
+
+	ctx := context.Background()
+	ctx = ent.NewContext(ctx, client)
+	ctx = authz.WithTestBypass(ctx)
+
+	enabled := false
+	err := service.UpdateRetryPolicy(ctx, &UpdateRetryPolicyInput{
+		EncryptedContentCleanupRetryEnabled: &enabled,
+	})
+	require.NoError(t, err)
+
+	policy, err := service.RetryPolicy(ctx)
+	require.NoError(t, err)
+	require.False(t, policy.EncryptedContentCleanupRetryEnabled)
+}
+
 func TestSystemService_ModelSettingsBackwardCompatibility(t *testing.T) {
 	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
 

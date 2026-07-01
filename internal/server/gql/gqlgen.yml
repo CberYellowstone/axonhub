@@ -194,7 +194,7 @@ models:
       - github.com/looplj/axonhub/internal/server/biz.RetryPolicy
   UpdateRetryPolicyInput:
     model:
-      - github.com/looplj/axonhub/internal/server/biz.RetryPolicy
+      - github.com/looplj/axonhub/internal/server/biz.UpdateRetryPolicyInput
   WebhookNotifierConfig:
     model:
       - github.com/looplj/axonhub/internal/server/biz.WebhookNotifierConfig

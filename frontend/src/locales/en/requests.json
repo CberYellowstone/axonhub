@@ -38,6 +38,8 @@
   "requests.columns.executedModelId": "Executed Model ID",
   "requests.columns.retryProcess": "Retry Process",
   "requests.columns.mappedModel": "Mapped Model",
+  "requests.execution.attemptType.encryptedContentCleanup": "Encrypted cleanup retry",
+  "requests.execution.attemptType.encryptedContentCleanupShort": "Cleanup",
   "requests.status.pending": "Pending",
   "requests.status.processing": "Processing",
   "requests.status.completed": "Completed",

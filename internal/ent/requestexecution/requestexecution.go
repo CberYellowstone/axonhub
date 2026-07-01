@@ -35,6 +35,8 @@ const (
 	FieldModelID = "model_id"
 	// FieldFormat holds the string denoting the format field in the database.
 	FieldFormat = "format"
+	// FieldAttemptType holds the string denoting the attempt_type field in the database.
+	FieldAttemptType = "attempt_type"
 	// FieldRequestBody holds the string denoting the request_body field in the database.
 	FieldRequestBody = "request_body"
 	// FieldResponseBody holds the string denoting the response_body field in the database.
@@ -104,6 +106,7 @@ var Columns = []string{
 	FieldExternalID,
 	FieldModelID,
 	FieldFormat,
+	FieldAttemptType,
 	FieldRequestBody,
 	FieldResponseBody,
 	FieldResponseChunks,
@@ -147,6 +150,32 @@ var (
 	// DefaultPassThroughApplied holds the default value on creation for the "pass_through_applied" field.
 	DefaultPassThroughApplied bool
 )
+
+// AttemptType defines the type for the "attempt_type" enum field.
+type AttemptType string
+
+// AttemptTypeNormal is the default value of the AttemptType enum.
+const DefaultAttemptType = AttemptTypeNormal
+
+// AttemptType values.
+const (
+	AttemptTypeNormal                  AttemptType = "normal"
+	AttemptTypeEncryptedContentCleanup AttemptType = "encrypted_content_cleanup"
+)
+
+func (at AttemptType) String() string {
+	return string(at)
+}
+
+// AttemptTypeValidator is a validator for the "attempt_type" field enum values. It is called by the builders before save.
+func AttemptTypeValidator(at AttemptType) error {
+	switch at {
+	case AttemptTypeNormal, AttemptTypeEncryptedContentCleanup:
+		return nil
+	default:
+		return fmt.Errorf("requestexecution: invalid enum value for attempt_type field: %q", at)
+	}
+}
 
 // Status defines the type for the "status" enum field.
 type Status string
@@ -225,6 +254,11 @@ func ByModelID(opts ...sql.OrderTermOption) OrderOption {
 // ByFormat orders the results by the format field.
 func ByFormat(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFormat, opts...).ToFunc()
+}
+
+// ByAttemptType orders the results by the attempt_type field.
+func ByAttemptType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAttemptType, opts...).ToFunc()
 }
 
 // ByErrorMessage orders the results by the error_message field.
@@ -312,6 +346,24 @@ func newDataStorageStep() *sqlgraph.Step {
 		sqlgraph.To(DataStorageInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, DataStorageTable, DataStorageColumn),
 	)
+}
+
+// MarshalGQL implements graphql.Marshaler interface.
+func (e AttemptType) MarshalGQL(w io.Writer) {
+	io.WriteString(w, strconv.Quote(e.String()))
+}
+
+// UnmarshalGQL implements graphql.Unmarshaler interface.
+func (e *AttemptType) UnmarshalGQL(val interface{}) error {
+	str, ok := val.(string)
+	if !ok {
+		return fmt.Errorf("enum %T must be a string", val)
+	}
+	*e = AttemptType(str)
+	if err := AttemptTypeValidator(*e); err != nil {
+		return fmt.Errorf("%s is not a valid AttemptType", str)
+	}
+	return nil
 }
 
 // MarshalGQL implements graphql.Marshaler interface.

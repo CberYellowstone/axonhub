@@ -310,6 +310,8 @@ const DefaultUpstreamErrorMessage = "Upstream provider request failed. Please tr
 type RetryPolicy struct {
 	// Enabled controls whether retry policy is active
 	Enabled bool `json:"enabled"`
+	// EncryptedContentCleanupRetryEnabled controls the GPT Responses 400 cleanup retry.
+	EncryptedContentCleanupRetryEnabled bool `json:"encrypted_content_cleanup_retry_enabled"`
 	// MaxChannelRetries defines the maximum number of different channels to retry
 	MaxChannelRetries int `json:"max_channel_retries"`
 	// MaxSingleChannelRetries defines the maximum number of retries for a single channel
@@ -338,6 +340,41 @@ type RetryPolicy struct {
 
 	// UpstreamErrorPolicy controls how provider errors are exposed to API users.
 	UpstreamErrorPolicy UpstreamErrorPolicy `json:"upstream_error_policy"`
+}
+
+type UpdateRetryPolicyInput struct {
+	Enabled                             *bool                `json:"enabled,omitempty"`
+	EncryptedContentCleanupRetryEnabled *bool                `json:"encrypted_content_cleanup_retry_enabled,omitempty"`
+	MaxChannelRetries                   *int                 `json:"max_channel_retries,omitempty"`
+	MaxSingleChannelRetries             *int                 `json:"max_single_channel_retries,omitempty"`
+	RetryDelayMs                        *int                 `json:"retry_delay_ms,omitempty"`
+	StreamFirstEventTimeoutSeconds      *int                 `json:"stream_first_event_timeout_seconds,omitempty"`
+	NonStreamResponseTimeoutSeconds     *int                 `json:"non_stream_response_timeout_seconds,omitempty"`
+	LoadBalancerStrategy                *string              `json:"load_balancer_strategy,omitempty"`
+	AutoDisableChannel                  *AutoDisableChannel  `json:"auto_disable_channel,omitempty"`
+	EmptyResponseDetection              *bool                `json:"empty_response_detection,omitempty"`
+	UpstreamErrorPolicy                 *UpstreamErrorPolicy `json:"upstream_error_policy,omitempty"`
+}
+
+func (p *RetryPolicy) UnmarshalJSON(data []byte) error {
+	type retryPolicyAlias RetryPolicy
+
+	var raw retryPolicyAlias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+
+	*p = RetryPolicy(raw)
+	if _, ok := fields["encrypted_content_cleanup_retry_enabled"]; !ok {
+		p.EncryptedContentCleanupRetryEnabled = defaultRetryPolicy.EncryptedContentCleanupRetryEnabled
+	}
+
+	return nil
 }
 
 type UpstreamErrorPolicy struct {
@@ -1022,6 +1059,53 @@ func (s *SystemService) SetRetryPolicy(ctx context.Context, policy *RetryPolicy)
 	}
 
 	return s.setSystemValue(ctx, SystemKeyRetryPolicy, string(jsonBytes))
+}
+
+func (s *SystemService) UpdateRetryPolicy(ctx context.Context, input *UpdateRetryPolicyInput) error {
+	policy, err := s.RetryPolicy(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get retry policy: %w", err)
+	}
+
+	if input == nil {
+		return s.SetRetryPolicy(ctx, policy)
+	}
+
+	if input.Enabled != nil {
+		policy.Enabled = *input.Enabled
+	}
+	if input.EncryptedContentCleanupRetryEnabled != nil {
+		policy.EncryptedContentCleanupRetryEnabled = *input.EncryptedContentCleanupRetryEnabled
+	}
+	if input.MaxChannelRetries != nil {
+		policy.MaxChannelRetries = *input.MaxChannelRetries
+	}
+	if input.MaxSingleChannelRetries != nil {
+		policy.MaxSingleChannelRetries = *input.MaxSingleChannelRetries
+	}
+	if input.RetryDelayMs != nil {
+		policy.RetryDelayMs = *input.RetryDelayMs
+	}
+	if input.StreamFirstEventTimeoutSeconds != nil {
+		policy.StreamFirstEventTimeoutSeconds = *input.StreamFirstEventTimeoutSeconds
+	}
+	if input.NonStreamResponseTimeoutSeconds != nil {
+		policy.NonStreamResponseTimeoutSeconds = *input.NonStreamResponseTimeoutSeconds
+	}
+	if input.LoadBalancerStrategy != nil {
+		policy.LoadBalancerStrategy = *input.LoadBalancerStrategy
+	}
+	if input.AutoDisableChannel != nil {
+		policy.AutoDisableChannel = *input.AutoDisableChannel
+	}
+	if input.EmptyResponseDetection != nil {
+		policy.EmptyResponseDetection = *input.EmptyResponseDetection
+	}
+	if input.UpstreamErrorPolicy != nil {
+		policy.UpstreamErrorPolicy = *input.UpstreamErrorPolicy
+	}
+
+	return s.SetRetryPolicy(ctx, policy)
 }
 
 func normalizeRetryPolicy(policy *RetryPolicy) {

@@ -35,6 +35,19 @@ type ChannelRetryable interface {
 	PrepareForRetry(ctx context.Context) error
 }
 
+// SpecialRetryable interface for transformers that support an extra retry attempt
+// outside the normal same-channel and channel-switch retry counters.
+type SpecialRetryable interface {
+	// CanSpecialRetry returns true if the transformer can run a special retry for the error.
+	CanSpecialRetry(ctx context.Context, err error) bool
+
+	// PrepareSpecialRetry prepares the transformer for a special retry attempt.
+	PrepareSpecialRetry(ctx context.Context, err error) error
+
+	// FinishSpecialRetry clears special retry state after the attempt finishes.
+	FinishSpecialRetry(ctx context.Context, originalErr error, specialErr error)
+}
+
 // ChannelCustomizedExecutor interface for channel need custom the process of request.
 // The customized executor will be used to execute the request.
 // e.g. the aws bedrock process need a custom executor to handle the request.
@@ -290,6 +303,25 @@ func (p *pipeline) Process(ctx context.Context, request *httpclient.Request) (*R
 		// Stop retrying if the context is canceled or the deadline is exceeded.
 		if ctx.Err() != nil {
 			return nil, lastErr
+		}
+
+		if specialRetryable, ok := p.Outbound.(SpecialRetryable); ok && specialRetryable.CanSpecialRetry(ctx, lastErr) {
+			originalErr := lastErr
+			if err := specialRetryable.PrepareSpecialRetry(ctx, originalErr); err == nil {
+				result, specialErr := p.processRequest(ctx, llmRequest)
+				specialRetryable.FinishSpecialRetry(ctx, originalErr, specialErr)
+				if specialErr == nil {
+					return result, nil
+				}
+
+				lastErr = originalErr
+			} else {
+				slog.WarnContext(ctx, "failed to prepare special retry", slog.Any("error", err))
+			}
+
+			if ctx.Err() != nil {
+				return nil, lastErr
+			}
 		}
 
 		// Determine retry strategy

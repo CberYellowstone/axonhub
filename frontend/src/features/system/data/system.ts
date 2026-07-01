@@ -101,6 +101,7 @@ const RETRY_POLICY_QUERY = `
       loadBalancerStrategy
       enabled
       emptyResponseDetection
+      encryptedContentCleanupRetryEnabled
       upstreamErrorPolicy {
         mode
         customMessage
@@ -352,6 +353,7 @@ export interface RetryPolicy {
   enabled: boolean;
   autoDisableChannel: AutoDisableChannel;
   emptyResponseDetection: boolean;
+  encryptedContentCleanupRetryEnabled: boolean;
   upstreamErrorPolicy: UpstreamErrorPolicy;
 }
 
@@ -380,6 +382,7 @@ export interface RetryPolicyInput {
   enabled?: boolean;
   autoDisableChannel?: AutoDisableChannelInput;
   emptyResponseDetection?: boolean;
+  encryptedContentCleanupRetryEnabled?: boolean;
   upstreamErrorPolicy?: Partial<UpstreamErrorPolicy>;
 }
 

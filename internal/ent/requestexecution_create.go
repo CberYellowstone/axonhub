@@ -136,6 +136,20 @@ func (_c *RequestExecutionCreate) SetNillableFormat(v *string) *RequestExecution
 	return _c
 }
 
+// SetAttemptType sets the "attempt_type" field.
+func (_c *RequestExecutionCreate) SetAttemptType(v requestexecution.AttemptType) *RequestExecutionCreate {
+	_c.mutation.SetAttemptType(v)
+	return _c
+}
+
+// SetNillableAttemptType sets the "attempt_type" field if the given value is not nil.
+func (_c *RequestExecutionCreate) SetNillableAttemptType(v *requestexecution.AttemptType) *RequestExecutionCreate {
+	if v != nil {
+		_c.SetAttemptType(*v)
+	}
+	return _c
+}
+
 // SetRequestBody sets the "request_body" field.
 func (_c *RequestExecutionCreate) SetRequestBody(v objects.JSONRawMessage) *RequestExecutionCreate {
 	_c.mutation.SetRequestBody(v)
@@ -344,6 +358,10 @@ func (_c *RequestExecutionCreate) defaults() {
 		v := requestexecution.DefaultFormat
 		_c.mutation.SetFormat(v)
 	}
+	if _, ok := _c.mutation.AttemptType(); !ok {
+		v := requestexecution.DefaultAttemptType
+		_c.mutation.SetAttemptType(v)
+	}
 	if _, ok := _c.mutation.Stream(); !ok {
 		v := requestexecution.DefaultStream
 		_c.mutation.SetStream(v)
@@ -372,6 +390,14 @@ func (_c *RequestExecutionCreate) check() error {
 	}
 	if _, ok := _c.mutation.Format(); !ok {
 		return &ValidationError{Name: "format", err: errors.New(`ent: missing required field "RequestExecution.format"`)}
+	}
+	if _, ok := _c.mutation.AttemptType(); !ok {
+		return &ValidationError{Name: "attempt_type", err: errors.New(`ent: missing required field "RequestExecution.attempt_type"`)}
+	}
+	if v, ok := _c.mutation.AttemptType(); ok {
+		if err := requestexecution.AttemptTypeValidator(v); err != nil {
+			return &ValidationError{Name: "attempt_type", err: fmt.Errorf(`ent: validator failed for field "RequestExecution.attempt_type": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.RequestBody(); !ok {
 		return &ValidationError{Name: "request_body", err: errors.New(`ent: missing required field "RequestExecution.request_body"`)}
@@ -443,6 +469,10 @@ func (_c *RequestExecutionCreate) createSpec() (*RequestExecution, *sqlgraph.Cre
 	if value, ok := _c.mutation.Format(); ok {
 		_spec.SetField(requestexecution.FieldFormat, field.TypeString, value)
 		_node.Format = value
+	}
+	if value, ok := _c.mutation.AttemptType(); ok {
+		_spec.SetField(requestexecution.FieldAttemptType, field.TypeEnum, value)
+		_node.AttemptType = value
 	}
 	if value, ok := _c.mutation.RequestBody(); ok {
 		_spec.SetField(requestexecution.FieldRequestBody, field.TypeJSON, value)
@@ -870,6 +900,9 @@ func (u *RequestExecutionUpsertOne) UpdateNewValues() *RequestExecutionUpsertOne
 		}
 		if _, exists := u.create.mutation.Format(); exists {
 			s.SetIgnore(requestexecution.FieldFormat)
+		}
+		if _, exists := u.create.mutation.AttemptType(); exists {
+			s.SetIgnore(requestexecution.FieldAttemptType)
 		}
 		if _, exists := u.create.mutation.RequestBody(); exists {
 			s.SetIgnore(requestexecution.FieldRequestBody)
@@ -1384,6 +1417,9 @@ func (u *RequestExecutionUpsertBulk) UpdateNewValues() *RequestExecutionUpsertBu
 			}
 			if _, exists := b.mutation.Format(); exists {
 				s.SetIgnore(requestexecution.FieldFormat)
+			}
+			if _, exists := b.mutation.AttemptType(); exists {
+				s.SetIgnore(requestexecution.FieldAttemptType)
 			}
 			if _, exists := b.mutation.RequestBody(); exists {
 				s.SetIgnore(requestexecution.FieldRequestBody)
