@@ -73,8 +73,8 @@ func (p *PersistentOutboundTransformer) FinishSpecialRetry(ctx context.Context, 
 		return
 	}
 
-	p.resetPassThroughStreamState()
 	if specialErr != nil {
+		p.resetPassThroughStreamState()
 		p.state.RequestExec = nil
 		p.state.PassThroughApplied = false
 	}

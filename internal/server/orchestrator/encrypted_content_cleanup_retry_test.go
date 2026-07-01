@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -174,6 +175,62 @@ func TestApplyEncryptedContentCleanupRetryBody_CleansResponsesBody(t *testing.T)
 	require.Equal(t, "auto", gjson.GetBytes(processed.Body, "tool_choice").String())
 	require.True(t, gjson.GetBytes(processed.Body, "parallel_tool_calls").Bool())
 	require.Equal(t, "function", gjson.GetBytes(processed.Body, "tools.0.type").String())
+}
+
+func TestPersistentOutboundTransformer_FinishSpecialRetryKeepsSuccessfulStreamOpen(t *testing.T) {
+	ctx := context.Background()
+	canceled := false
+	outbound := &PersistentOutboundTransformer{
+		state: &PersistenceState{
+			SpecialRetryActive:         true,
+			SpecialRetryType:           specialRetryTypeEncryptedContentCleanupSameChannel,
+			SpecialRetryTriggerStatus:  http.StatusBadRequest,
+			SpecialRetryTriggerMessage: "invalid_encrypted_content",
+			RawStreamCancel: func() {
+				canceled = true
+			},
+			RawStreamCh: make(chan *httpclient.StreamEvent),
+		},
+	}
+
+	outbound.FinishSpecialRetry(ctx, errors.New("original"), nil)
+
+	require.False(t, canceled, "successful streaming special retry must remain readable by the handler")
+	require.NotNil(t, outbound.state.RawStreamCancel)
+	require.NotNil(t, outbound.state.RawStreamCh)
+	require.False(t, outbound.state.SpecialRetryActive)
+	require.Empty(t, outbound.state.SpecialRetryType)
+	require.Zero(t, outbound.state.SpecialRetryTriggerStatus)
+	require.Empty(t, outbound.state.SpecialRetryTriggerMessage)
+}
+
+func TestPersistentOutboundTransformer_FinishSpecialRetryCleansFailedStream(t *testing.T) {
+	ctx := context.Background()
+	canceled := false
+	outbound := &PersistentOutboundTransformer{
+		state: &PersistenceState{
+			SpecialRetryActive: true,
+			SpecialRetryType:   specialRetryTypeEncryptedContentCleanupSameChannel,
+			RawStreamCancel: func() {
+				canceled = true
+			},
+			RawStreamCh:        make(chan *httpclient.StreamEvent),
+			RawStreamErrRef:    new(error),
+			RequestExec:        &ent.RequestExecution{ID: 1},
+			PassThroughApplied: true,
+		},
+	}
+
+	outbound.FinishSpecialRetry(ctx, errors.New("original"), errors.New("special failed"))
+
+	require.True(t, canceled)
+	require.Nil(t, outbound.state.RawStreamCancel)
+	require.Nil(t, outbound.state.RawStreamCh)
+	require.Nil(t, outbound.state.RawStreamErrRef)
+	require.Nil(t, outbound.state.RequestExec)
+	require.False(t, outbound.state.PassThroughApplied)
+	require.False(t, outbound.state.SpecialRetryActive)
+	require.Empty(t, outbound.state.SpecialRetryType)
 }
 
 func newEncryptedContentCleanupRetryTestOutbound(
