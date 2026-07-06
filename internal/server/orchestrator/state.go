@@ -14,14 +14,15 @@ import (
 type PersistenceState struct {
 	APIKey *ent.APIKey
 
-	RequestService      *biz.RequestService
-	UsageLogService     *biz.UsageLogService
-	ChannelService      *biz.ChannelService
-	PromptProvider      PromptProvider
-	PromptProtecter     PromptProtecter
-	RetryPolicyProvider RetryPolicyProvider
-	CandidateSelector   CandidateSelector
-	LoadBalancer        *LoadBalancer
+	RequestService                *biz.RequestService
+	UsageLogService               *biz.UsageLogService
+	ChannelService                *biz.ChannelService
+	PromptProvider                PromptProvider
+	PromptProtecter               PromptProtecter
+	RetryPolicyProvider           RetryPolicyProvider
+	CandidateSelector             CandidateSelector
+	LoadBalancer                  *LoadBalancer
+	EncryptedContentCleanupSticky *encryptedContentCleanupStickyStore
 
 	// Request state
 	ModelMapper *ModelMapper
@@ -90,4 +91,17 @@ type PersistenceState struct {
 	SpecialRetryTriggerStatus int
 	// SpecialRetryTriggerMessage records the error text that triggered the special retry.
 	SpecialRetryTriggerMessage string
+	// EncryptedContentCleanupDefaultApplied records whether sticky default cleanup
+	// changed the first outbound body for this attempt.
+	EncryptedContentCleanupDefaultApplied bool
+	// SpecialRetryOriginalDefaultCleanupApplied snapshots the original attempt state.
+	SpecialRetryOriginalDefaultCleanupApplied bool
+	// SpecialRetryCleanupBodyApplied records whether the special retry body was changed.
+	SpecialRetryCleanupBodyApplied bool
+	// PendingCleanupFailurePerf defers the original failure performance record until
+	// the cleanup special retry outcome is known.
+	PendingCleanupFailurePerf *biz.PerformanceRecord
+	// PendingCleanupCircuitBreaker defers the original model circuit-breaker error
+	// until the cleanup special retry outcome is known.
+	PendingCleanupCircuitBreaker *pendingCleanupCircuitBreakerError
 }

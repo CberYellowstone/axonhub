@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/looplj/axonhub/internal/server/biz"
 	"github.com/looplj/axonhub/llm"
@@ -64,6 +65,8 @@ func (p *PersistentOutboundTransformer) PrepareSpecialRetry(ctx context.Context,
 	p.state.SpecialRetryType = specialRetryTypeEncryptedContentCleanupSameChannel
 	p.state.SpecialRetryTriggerStatus = ExtractStatusCodeFromError(err)
 	p.state.SpecialRetryTriggerMessage = encryptedContentCleanupErrorText(err)
+	p.state.SpecialRetryOriginalDefaultCleanupApplied = p.state.EncryptedContentCleanupDefaultApplied
+	p.state.SpecialRetryCleanupBodyApplied = false
 
 	return nil
 }
@@ -79,10 +82,67 @@ func (p *PersistentOutboundTransformer) FinishSpecialRetry(ctx context.Context, 
 		p.state.PassThroughApplied = false
 	}
 
+	p.finishPendingEncryptedContentCleanupAccounting(ctx, specialErr)
+	p.markEncryptedContentCleanupStickyIfNeeded(ctx, specialErr)
+
 	p.state.SpecialRetryActive = false
 	p.state.SpecialRetryType = ""
 	p.state.SpecialRetryTriggerStatus = 0
 	p.state.SpecialRetryTriggerMessage = ""
+	p.state.SpecialRetryOriginalDefaultCleanupApplied = false
+	p.state.SpecialRetryCleanupBodyApplied = false
+}
+
+func (p *PersistentOutboundTransformer) finishPendingEncryptedContentCleanupAccounting(ctx context.Context, specialErr error) {
+	if p == nil || p.state == nil {
+		return
+	}
+
+	dropPending := p.isRecoveredByAppliedEncryptedContentCleanup(specialErr)
+	if pending := p.state.PendingCleanupFailurePerf; pending != nil {
+		if !dropPending && p.state.ChannelService != nil {
+			p.state.ChannelService.AsyncRecordPerformance(ctx, pending)
+		}
+		p.state.PendingCleanupFailurePerf = nil
+	}
+
+	if pending := p.state.PendingCleanupCircuitBreaker; pending != nil {
+		if !dropPending {
+			pending.Record(ctx)
+		}
+		p.state.PendingCleanupCircuitBreaker = nil
+	}
+}
+
+func (p *PersistentOutboundTransformer) markEncryptedContentCleanupStickyIfNeeded(ctx context.Context, specialErr error) {
+	if p == nil || p.state == nil ||
+		!p.isRecoveredByAppliedEncryptedContentCleanup(specialErr) ||
+		p.state.EncryptedContentCleanupSticky == nil {
+		return
+	}
+
+	policy := p.currentRetryPolicy(ctx)
+	if policy == nil ||
+		!policy.Enabled ||
+		!policy.EncryptedContentCleanupRetryEnabled ||
+		policy.EncryptedContentCleanupStickySeconds <= 0 {
+		return
+	}
+
+	p.state.EncryptedContentCleanupSticky.Mark(
+		ctx,
+		time.Duration(policy.EncryptedContentCleanupStickySeconds)*time.Second,
+	)
+}
+
+func (p *PersistentOutboundTransformer) isRecoveredByAppliedEncryptedContentCleanup(specialErr error) bool {
+	return p != nil &&
+		p.state != nil &&
+		specialErr == nil &&
+		p.state.SpecialRetryType == specialRetryTypeEncryptedContentCleanupSameChannel &&
+		p.state.SpecialRetryTriggerStatus == http.StatusBadRequest &&
+		!p.state.SpecialRetryOriginalDefaultCleanupApplied &&
+		p.state.SpecialRetryCleanupBodyApplied
 }
 
 func (p *PersistentOutboundTransformer) currentRetryPolicy(ctx context.Context) *biz.RetryPolicy {
@@ -175,9 +235,33 @@ func encryptedContentCleanupErrorText(err error) string {
 
 func applyEncryptedContentCleanupRetryBody(outbound *PersistentOutboundTransformer) pipeline.Middleware {
 	return pipeline.OnRawRequest("encrypted-content-cleanup-retry-body", func(ctx context.Context, request *httpclient.Request) (*httpclient.Request, error) {
-		if outbound == nil || outbound.state == nil ||
-			!outbound.state.SpecialRetryActive ||
-			outbound.state.SpecialRetryType != specialRetryTypeEncryptedContentCleanupSameChannel {
+		if outbound == nil || outbound.state == nil {
+			return request, nil
+		}
+
+		if outbound.state.SpecialRetryActive &&
+			outbound.state.SpecialRetryType == specialRetryTypeEncryptedContentCleanupSameChannel {
+			cleaned, ok := cleanupEncryptedContentRequestBody(request)
+			if !ok {
+				return request, nil
+			}
+
+			applyCleanedRequestBody(request, cleaned)
+			outbound.state.SpecialRetryCleanupBodyApplied = true
+
+			return request, nil
+		}
+
+		outbound.state.EncryptedContentCleanupDefaultApplied = false
+		if isEncryptedContentCleanupCompactRequest(outbound, request) {
+			if outbound.state.EncryptedContentCleanupSticky != nil {
+				outbound.state.EncryptedContentCleanupSticky.Clear(ctx)
+			}
+
+			return request, nil
+		}
+
+		if !outbound.shouldApplyEncryptedContentCleanupDefault(ctx) {
 			return request, nil
 		}
 
@@ -186,11 +270,65 @@ func applyEncryptedContentCleanupRetryBody(outbound *PersistentOutboundTransform
 			return request, nil
 		}
 
-		request.Body = cleaned
-		request.JSONBody = cleaned
+		applyCleanedRequestBody(request, cleaned)
+		outbound.state.EncryptedContentCleanupDefaultApplied = true
 
 		return request, nil
 	})
+}
+
+func (p *PersistentOutboundTransformer) shouldApplyEncryptedContentCleanupDefault(ctx context.Context) bool {
+	if p == nil || p.state == nil || p.state.EncryptedContentCleanupSticky == nil {
+		return false
+	}
+
+	policy := p.currentRetryPolicy(ctx)
+	if policy == nil ||
+		!policy.Enabled ||
+		!policy.EncryptedContentCleanupRetryEnabled ||
+		policy.EncryptedContentCleanupStickySeconds <= 0 {
+		return false
+	}
+
+	if !p.state.EncryptedContentCleanupSticky.Active(ctx) {
+		return false
+	}
+
+	return isOpenAIResponsesFormat(p.currentProviderAPIFormat()) && isGPTModel(p.currentProviderModel())
+}
+
+func (p *PersistentOutboundTransformer) shouldDeferEncryptedContentCleanupFailure(ctx context.Context, err error) bool {
+	if p == nil || p.state == nil || err == nil {
+		return false
+	}
+
+	policy := p.currentRetryPolicy(ctx)
+	if policy == nil || !policy.IgnoreCleanedUpEncryptedContentErrors {
+		return false
+	}
+
+	return p.CanSpecialRetry(ctx, err)
+}
+
+func isEncryptedContentCleanupCompactRequest(outbound *PersistentOutboundTransformer, request *httpclient.Request) bool {
+	if request != nil {
+		if llm.RequestType(request.RequestType) == llm.RequestTypeCompact {
+			return true
+		}
+		if llm.APIFormat(request.APIFormat) == llm.APIFormatOpenAIResponseCompact {
+			return true
+		}
+	}
+
+	return outbound != nil &&
+		outbound.state != nil &&
+		outbound.state.LlmRequest != nil &&
+		outbound.state.LlmRequest.RequestType == llm.RequestTypeCompact
+}
+
+func applyCleanedRequestBody(request *httpclient.Request, cleaned []byte) {
+	request.Body = cleaned
+	request.JSONBody = cleaned
 }
 
 func cleanupEncryptedContentRequestBody(request *httpclient.Request) ([]byte, bool) {
@@ -211,8 +349,11 @@ func cleanupEncryptedContentRequestBody(request *httpclient.Request) ([]byte, bo
 		return nil, false
 	}
 
-	removeEncryptedContentFields(value)
-	removeEmptyResponsesReasoningItems(value)
+	changed := removeEncryptedContentFields(value)
+	changed = removeResponsesReasoningItems(value) || changed
+	if !changed {
+		return nil, false
+	}
 
 	cleaned, err := json.Marshal(value)
 	if err != nil {
@@ -222,91 +363,64 @@ func cleanupEncryptedContentRequestBody(request *httpclient.Request) ([]byte, bo
 	return cleaned, true
 }
 
-func removeEncryptedContentFields(value any) {
+func removeEncryptedContentFields(value any) bool {
+	changed := false
 	switch typed := value.(type) {
 	case map[string]any:
 		for key := range encryptedContentCleanupFieldNames {
-			delete(typed, key)
+			if _, ok := typed[key]; ok {
+				delete(typed, key)
+				changed = true
+			}
 		}
 		for _, child := range typed {
-			removeEncryptedContentFields(child)
+			changed = removeEncryptedContentFields(child) || changed
 		}
 	case []any:
 		for _, child := range typed {
-			removeEncryptedContentFields(child)
+			changed = removeEncryptedContentFields(child) || changed
 		}
 	}
+
+	return changed
 }
 
-func removeEmptyResponsesReasoningItems(value any) {
+func removeResponsesReasoningItems(value any) bool {
 	obj, ok := value.(map[string]any)
 	if !ok {
-		return
+		return false
 	}
 
 	input, ok := obj["input"].([]any)
 	if !ok {
-		return
+		return false
 	}
 
+	changed := false
 	filtered := make([]any, 0, len(input))
 	for _, item := range input {
-		if isEmptyResponsesReasoningItem(item) {
+		if isResponsesReasoningItem(item) {
+			changed = true
 			continue
 		}
 
 		filtered = append(filtered, item)
 	}
+	if !changed {
+		return false
+	}
 
 	obj["input"] = filtered
+
+	return true
 }
 
-func isEmptyResponsesReasoningItem(value any) bool {
+func isResponsesReasoningItem(value any) bool {
 	item, ok := value.(map[string]any)
 	if !ok {
 		return false
 	}
 
 	itemType, _ := item["type"].(string)
-	if !strings.EqualFold(itemType, "reasoning") {
-		return false
-	}
-
-	for _, key := range []string{"summary", "content", "reasoning_content", "text"} {
-		if hasUsableReasoningValue(item[key]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func hasUsableReasoningValue(value any) bool {
-	switch typed := value.(type) {
-	case nil:
-		return false
-	case string:
-		return strings.TrimSpace(typed) != ""
-	case []any:
-		for _, item := range typed {
-			if hasUsableReasoningValue(item) {
-				return true
-			}
-		}
-
-		return false
-	case map[string]any:
-		for key, item := range typed {
-			if strings.EqualFold(key, "type") {
-				continue
-			}
-			if hasUsableReasoningValue(item) {
-				return true
-			}
-		}
-
-		return false
-	default:
-		return true
-	}
+	return strings.EqualFold(itemType, "reasoning")
 }

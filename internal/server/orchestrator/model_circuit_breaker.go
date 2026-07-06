@@ -103,7 +103,36 @@ func (m *modelCircuitBreakerTracker) OnOutboundRawError(ctx context.Context, err
 
 	channel := m.outbound.GetCurrentChannel()
 	modelID := m.outbound.GetRequestedModel()
+	if channel == nil || modelID == "" {
+		return
+	}
+
+	if m.outbound.shouldDeferEncryptedContentCleanupFailure(ctx, err) {
+		m.outbound.state.PendingCleanupCircuitBreaker = &pendingCleanupCircuitBreakerError{
+			modelCircuitBreaker: m.modelCircuitBreaker,
+			channelID:           channel.ID,
+			modelID:             modelID,
+			wasProbe:            wasProbe,
+		}
+		return
+	}
+
 	m.modelCircuitBreaker.RecordError(ctx, channel.ID, modelID, wasProbe)
+}
+
+type pendingCleanupCircuitBreakerError struct {
+	modelCircuitBreaker *biz.ModelCircuitBreaker
+	channelID           int
+	modelID             string
+	wasProbe            bool
+}
+
+func (p *pendingCleanupCircuitBreakerError) Record(ctx context.Context) {
+	if p == nil || p.modelCircuitBreaker == nil {
+		return
+	}
+
+	p.modelCircuitBreaker.RecordError(ctx, p.channelID, p.modelID, p.wasProbe)
 }
 
 func (m *modelCircuitBreakerTracker) OnOutboundLlmStream(ctx context.Context, stream streams.Stream[*llm.Response]) (streams.Stream[*llm.Response], error) {

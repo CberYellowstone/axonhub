@@ -977,6 +977,8 @@ func TestChatCompletionOrchestrator_Process_EncryptedContentCleanupRetryChain(t 
 	require.NotContains(t, string(executor.requests[1].Body), "encrypted_content")
 	require.Contains(t, string(executor.requests[2].Body), "encrypted_content")
 	require.NotContains(t, string(executor.requests[3].Body), "encrypted_content")
+	assertCleanupRetryBodyRemovesReasoningItems(t, executor.requests[1].Body)
+	assertCleanupRetryBodyRemovesReasoningItems(t, executor.requests[3].Body)
 
 	executions, err := client.RequestExecution.Query().
 		Order(ent.Asc(requestexecution.FieldID)).
@@ -991,6 +993,22 @@ func TestChatCompletionOrchestrator_Process_EncryptedContentCleanupRetryChain(t 
 	require.NotContains(t, string(executions[1].RequestBody), "encrypted_content")
 	require.Contains(t, string(executions[2].RequestBody), "encrypted_content")
 	require.NotContains(t, string(executions[3].RequestBody), "encrypted_content")
+	assertCleanupRetryBodyRemovesReasoningItems(t, executions[1].RequestBody)
+	assertCleanupRetryBodyRemovesReasoningItems(t, executions[3].RequestBody)
+}
+
+func assertCleanupRetryBodyRemovesReasoningItems(t *testing.T, body []byte) {
+	t.Helper()
+
+	var parsed struct {
+		Input []struct {
+			Type string `json:"type"`
+		} `json:"input"`
+	}
+	err := json.Unmarshal(body, &parsed)
+	require.NoError(t, err)
+	require.Len(t, parsed.Input, 1)
+	require.Equal(t, "message", parsed.Input[0].Type)
 }
 
 func createResponsesCleanupRetryTestChannel(t *testing.T, ctx context.Context, client *ent.Client, name string) *ent.Channel {

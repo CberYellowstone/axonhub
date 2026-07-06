@@ -28,6 +28,8 @@ export function RetrySettings() {
     loadBalancerStrategy: 'adaptive',
     emptyResponseDetection: false,
     encryptedContentCleanupRetryEnabled: true,
+    encryptedContentCleanupStickySeconds: 300,
+    ignoreCleanedUpEncryptedContentErrors: false,
     upstreamErrorPolicy: {
       mode: 'passthrough',
       customMessage: '',
@@ -50,6 +52,8 @@ export function RetrySettings() {
         loadBalancerStrategy: retryPolicy.loadBalancerStrategy,
         emptyResponseDetection: retryPolicy.emptyResponseDetection,
         encryptedContentCleanupRetryEnabled: retryPolicy.encryptedContentCleanupRetryEnabled ?? true,
+        encryptedContentCleanupStickySeconds: retryPolicy.encryptedContentCleanupStickySeconds ?? 300,
+        ignoreCleanedUpEncryptedContentErrors: retryPolicy.ignoreCleanedUpEncryptedContentErrors ?? false,
         upstreamErrorPolicy: {
           mode: retryPolicy.upstreamErrorPolicy?.mode || 'passthrough',
           customMessage: retryPolicy.upstreamErrorPolicy?.customMessage || '',
@@ -326,18 +330,61 @@ export function RetrySettings() {
               <Separator />
 
               {/* Encrypted Content Cleanup Retry */}
-              <div className='flex items-center justify-between gap-4'>
-                <div className='space-y-0.5'>
-                  <Label htmlFor='encrypted-content-cleanup-retry' className='text-base'>
-                    {t('system.retry.encryptedContentCleanupRetry.label')}
-                  </Label>
-                  <div className='text-muted-foreground text-sm'>{t('system.retry.encryptedContentCleanupRetry.description')}</div>
+              <div className='space-y-4'>
+                <div className='flex items-center justify-between gap-4'>
+                  <div className='space-y-0.5'>
+                    <Label htmlFor='encrypted-content-cleanup-retry' className='text-base'>
+                      {t('system.retry.encryptedContentCleanupRetry.label')}
+                    </Label>
+                    <div className='text-muted-foreground text-sm'>{t('system.retry.encryptedContentCleanupRetry.description')}</div>
+                  </div>
+                  <Switch
+                    id='encrypted-content-cleanup-retry'
+                    checked={formData.encryptedContentCleanupRetryEnabled ?? true}
+                    onCheckedChange={(checked) => handleInputChange('encryptedContentCleanupRetryEnabled', checked)}
+                  />
                 </div>
-                <Switch
-                  id='encrypted-content-cleanup-retry'
-                  checked={formData.encryptedContentCleanupRetryEnabled ?? true}
-                  onCheckedChange={(checked) => handleInputChange('encryptedContentCleanupRetryEnabled', checked)}
-                />
+
+                <div className='grid gap-4 md:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='encrypted-content-cleanup-sticky-seconds'>
+                      {t('system.retry.encryptedContentCleanupStickySeconds.label')}
+                    </Label>
+                    <div className='text-muted-foreground mb-2 text-sm'>
+                      {t('system.retry.encryptedContentCleanupStickySeconds.description')}
+                    </div>
+                    <div className='flex items-center space-x-2'>
+                      <Input
+                        id='encrypted-content-cleanup-sticky-seconds'
+                        type='number'
+                        min='0'
+                        max='86400'
+                        value={formData.encryptedContentCleanupStickySeconds}
+                        disabled={!formData.encryptedContentCleanupRetryEnabled}
+                        onChange={(e) => handleInputChange('encryptedContentCleanupStickySeconds', parseInt(e.target.value) || 0)}
+                        className='w-32'
+                      />
+                      <span className='text-muted-foreground text-sm'>s</span>
+                    </div>
+                  </div>
+
+                  <div className='flex items-center justify-between gap-4'>
+                    <div className='space-y-0.5'>
+                      <Label htmlFor='ignore-cleaned-up-encrypted-content-errors' className='text-base'>
+                        {t('system.retry.ignoreCleanedUpEncryptedContentErrors.label')}
+                      </Label>
+                      <div className='text-muted-foreground text-sm'>
+                        {t('system.retry.ignoreCleanedUpEncryptedContentErrors.description')}
+                      </div>
+                    </div>
+                    <Switch
+                      id='ignore-cleaned-up-encrypted-content-errors'
+                      checked={formData.ignoreCleanedUpEncryptedContentErrors ?? false}
+                      disabled={!formData.encryptedContentCleanupRetryEnabled}
+                      onCheckedChange={(checked) => handleInputChange('ignoreCleanedUpEncryptedContentErrors', checked)}
+                    />
+                  </div>
+                </div>
               </div>
 
               <Separator />

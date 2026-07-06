@@ -595,6 +595,8 @@ func TestSystemService_RetryPolicy_BackfillsEncryptedContentCleanupRetry(t *test
 	require.NoError(t, err)
 	require.True(t, policy.Enabled)
 	require.True(t, policy.EncryptedContentCleanupRetryEnabled)
+	require.Equal(t, defaultRetryPolicy.EncryptedContentCleanupStickySeconds, policy.EncryptedContentCleanupStickySeconds)
+	require.False(t, policy.IgnoreCleanedUpEncryptedContentErrors)
 }
 
 func TestSystemService_UpdateRetryPolicy_PreservesOmittedEncryptedContentCleanupRetry(t *testing.T) {
@@ -608,12 +610,14 @@ func TestSystemService_UpdateRetryPolicy_PreservesOmittedEncryptedContentCleanup
 	ctx = authz.WithTestBypass(ctx)
 
 	err := service.SetRetryPolicy(ctx, &RetryPolicy{
-		Enabled:                             true,
-		EncryptedContentCleanupRetryEnabled: true,
-		MaxChannelRetries:                   3,
-		MaxSingleChannelRetries:             2,
-		RetryDelayMs:                        1000,
-		LoadBalancerStrategy:                LoadBalancerStrategyAdaptive,
+		Enabled:                               true,
+		EncryptedContentCleanupRetryEnabled:   true,
+		EncryptedContentCleanupStickySeconds:  120,
+		IgnoreCleanedUpEncryptedContentErrors: true,
+		MaxChannelRetries:                     3,
+		MaxSingleChannelRetries:               2,
+		RetryDelayMs:                          1000,
+		LoadBalancerStrategy:                  LoadBalancerStrategyAdaptive,
 		UpstreamErrorPolicy: UpstreamErrorPolicy{
 			Mode: UpstreamErrorModePassthrough,
 		},
@@ -630,6 +634,8 @@ func TestSystemService_UpdateRetryPolicy_PreservesOmittedEncryptedContentCleanup
 	require.NoError(t, err)
 	require.False(t, policy.Enabled)
 	require.True(t, policy.EncryptedContentCleanupRetryEnabled)
+	require.Equal(t, 120, policy.EncryptedContentCleanupStickySeconds)
+	require.True(t, policy.IgnoreCleanedUpEncryptedContentErrors)
 }
 
 func TestSystemService_UpdateRetryPolicy_SavesExplicitEncryptedContentCleanupRetryFalse(t *testing.T) {
@@ -651,6 +657,40 @@ func TestSystemService_UpdateRetryPolicy_SavesExplicitEncryptedContentCleanupRet
 	policy, err := service.RetryPolicy(ctx)
 	require.NoError(t, err)
 	require.False(t, policy.EncryptedContentCleanupRetryEnabled)
+}
+
+func TestSystemService_UpdateRetryPolicy_SavesEncryptedContentCleanupStickyAndIgnoreErrors(t *testing.T) {
+	cacheConfig := xcache.Config{Mode: xcache.ModeMemory}
+
+	service, client := setupTestSystemService(t, cacheConfig)
+	defer client.Close()
+
+	ctx := context.Background()
+	ctx = ent.NewContext(ctx, client)
+	ctx = authz.WithTestBypass(ctx)
+
+	stickySeconds := 900
+	ignoreErrors := true
+	err := service.UpdateRetryPolicy(ctx, &UpdateRetryPolicyInput{
+		EncryptedContentCleanupStickySeconds:  &stickySeconds,
+		IgnoreCleanedUpEncryptedContentErrors: &ignoreErrors,
+	})
+	require.NoError(t, err)
+
+	policy, err := service.RetryPolicy(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 900, policy.EncryptedContentCleanupStickySeconds)
+	require.True(t, policy.IgnoreCleanedUpEncryptedContentErrors)
+
+	stickySeconds = -1
+	err = service.UpdateRetryPolicy(ctx, &UpdateRetryPolicyInput{
+		EncryptedContentCleanupStickySeconds: &stickySeconds,
+	})
+	require.NoError(t, err)
+
+	policy, err = service.RetryPolicy(ctx)
+	require.NoError(t, err)
+	require.Zero(t, policy.EncryptedContentCleanupStickySeconds)
 }
 
 func TestSystemService_ModelSettingsBackwardCompatibility(t *testing.T) {

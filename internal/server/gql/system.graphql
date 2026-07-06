@@ -127,6 +127,8 @@ type RetryPolicy {
   loadBalancerStrategy: String!
   enabled: Boolean!
   encryptedContentCleanupRetryEnabled: Boolean!
+  encryptedContentCleanupStickySeconds: Int!
+  ignoreCleanedUpEncryptedContentErrors: Boolean!
   autoDisableChannel: AutoDisableChannel!
   emptyResponseDetection: Boolean!
   upstreamErrorPolicy: UpstreamErrorPolicy!
@@ -161,6 +163,8 @@ input UpdateRetryPolicyInput {
   loadBalancerStrategy: String
   enabled: Boolean
   encryptedContentCleanupRetryEnabled: Boolean
+  encryptedContentCleanupStickySeconds: Int
+  ignoreCleanedUpEncryptedContentErrors: Boolean
   autoDisableChannel: AutoDisableChannelInput
   emptyResponseDetection: Boolean
   upstreamErrorPolicy: UpstreamErrorPolicyInput

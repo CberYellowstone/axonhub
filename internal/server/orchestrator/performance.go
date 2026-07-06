@@ -130,6 +130,11 @@ func (m *performanceRecording) OnOutboundRawError(ctx context.Context, err error
 		perf.MarkFailed(errorCode)
 	}
 
+	if !perf.Canceled && m.outbound.shouldDeferEncryptedContentCleanupFailure(ctx, err) {
+		m.outbound.state.PendingCleanupFailurePerf = perf
+		return
+	}
+
 	m.outbound.state.ChannelService.AsyncRecordPerformance(ctx, perf)
 }
 

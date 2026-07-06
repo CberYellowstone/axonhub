@@ -20,12 +20,14 @@ var defaultStoragePolicy = StoragePolicy{
 }
 
 var defaultRetryPolicy = RetryPolicy{
-	MaxChannelRetries:                   3,
-	MaxSingleChannelRetries:             2,
-	RetryDelayMs:                        1000,
-	LoadBalancerStrategy:                "adaptive",
-	Enabled:                             true,
-	EncryptedContentCleanupRetryEnabled: true,
+	MaxChannelRetries:                     3,
+	MaxSingleChannelRetries:               2,
+	RetryDelayMs:                          1000,
+	LoadBalancerStrategy:                  "adaptive",
+	Enabled:                               true,
+	EncryptedContentCleanupRetryEnabled:   true,
+	EncryptedContentCleanupStickySeconds:  300,
+	IgnoreCleanedUpEncryptedContentErrors: false,
 	UpstreamErrorPolicy: UpstreamErrorPolicy{
 		Mode: UpstreamErrorModePassthrough,
 	},

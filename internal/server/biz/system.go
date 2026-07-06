@@ -309,12 +309,20 @@ const (
 
 const DefaultUpstreamErrorMessage = "Upstream provider request failed. Please try again later."
 
+const maxEncryptedContentCleanupStickySeconds = 86400
+
 // RetryPolicy represents the retry policy configuration.
 type RetryPolicy struct {
 	// Enabled controls whether retry policy is active
 	Enabled bool `json:"enabled"`
 	// EncryptedContentCleanupRetryEnabled controls the GPT Responses 400 cleanup retry.
 	EncryptedContentCleanupRetryEnabled bool `json:"encrypted_content_cleanup_retry_enabled"`
+	// EncryptedContentCleanupStickySeconds keeps successful cleanup-recovered sessions
+	// on default cleanup for the configured TTL. Set to 0 to disable sticky cleanup.
+	EncryptedContentCleanupStickySeconds int `json:"encrypted_content_cleanup_sticky_seconds"`
+	// IgnoreCleanedUpEncryptedContentErrors skips failure accounting for original
+	// HTTP 400 attempts when the cleanup special retry succeeds.
+	IgnoreCleanedUpEncryptedContentErrors bool `json:"ignore_cleaned_up_encrypted_content_errors"`
 	// MaxChannelRetries defines the maximum number of different channels to retry
 	MaxChannelRetries int `json:"max_channel_retries"`
 	// MaxSingleChannelRetries defines the maximum number of retries for a single channel
@@ -346,17 +354,19 @@ type RetryPolicy struct {
 }
 
 type UpdateRetryPolicyInput struct {
-	Enabled                             *bool                `json:"enabled,omitempty"`
-	EncryptedContentCleanupRetryEnabled *bool                `json:"encrypted_content_cleanup_retry_enabled,omitempty"`
-	MaxChannelRetries                   *int                 `json:"max_channel_retries,omitempty"`
-	MaxSingleChannelRetries             *int                 `json:"max_single_channel_retries,omitempty"`
-	RetryDelayMs                        *int                 `json:"retry_delay_ms,omitempty"`
-	StreamFirstEventTimeoutSeconds      *int                 `json:"stream_first_event_timeout_seconds,omitempty"`
-	NonStreamResponseTimeoutSeconds     *int                 `json:"non_stream_response_timeout_seconds,omitempty"`
-	LoadBalancerStrategy                *string              `json:"load_balancer_strategy,omitempty"`
-	AutoDisableChannel                  *AutoDisableChannel  `json:"auto_disable_channel,omitempty"`
-	EmptyResponseDetection              *bool                `json:"empty_response_detection,omitempty"`
-	UpstreamErrorPolicy                 *UpstreamErrorPolicy `json:"upstream_error_policy,omitempty"`
+	Enabled                               *bool                `json:"enabled,omitempty"`
+	EncryptedContentCleanupRetryEnabled   *bool                `json:"encrypted_content_cleanup_retry_enabled,omitempty"`
+	EncryptedContentCleanupStickySeconds  *int                 `json:"encrypted_content_cleanup_sticky_seconds,omitempty"`
+	IgnoreCleanedUpEncryptedContentErrors *bool                `json:"ignore_cleaned_up_encrypted_content_errors,omitempty"`
+	MaxChannelRetries                     *int                 `json:"max_channel_retries,omitempty"`
+	MaxSingleChannelRetries               *int                 `json:"max_single_channel_retries,omitempty"`
+	RetryDelayMs                          *int                 `json:"retry_delay_ms,omitempty"`
+	StreamFirstEventTimeoutSeconds        *int                 `json:"stream_first_event_timeout_seconds,omitempty"`
+	NonStreamResponseTimeoutSeconds       *int                 `json:"non_stream_response_timeout_seconds,omitempty"`
+	LoadBalancerStrategy                  *string              `json:"load_balancer_strategy,omitempty"`
+	AutoDisableChannel                    *AutoDisableChannel  `json:"auto_disable_channel,omitempty"`
+	EmptyResponseDetection                *bool                `json:"empty_response_detection,omitempty"`
+	UpstreamErrorPolicy                   *UpstreamErrorPolicy `json:"upstream_error_policy,omitempty"`
 }
 
 func (p *RetryPolicy) UnmarshalJSON(data []byte) error {
@@ -375,6 +385,9 @@ func (p *RetryPolicy) UnmarshalJSON(data []byte) error {
 	*p = RetryPolicy(raw)
 	if _, ok := fields["encrypted_content_cleanup_retry_enabled"]; !ok {
 		p.EncryptedContentCleanupRetryEnabled = defaultRetryPolicy.EncryptedContentCleanupRetryEnabled
+	}
+	if _, ok := fields["encrypted_content_cleanup_sticky_seconds"]; !ok {
+		p.EncryptedContentCleanupStickySeconds = defaultRetryPolicy.EncryptedContentCleanupStickySeconds
 	}
 
 	return nil
@@ -1080,6 +1093,12 @@ func (s *SystemService) UpdateRetryPolicy(ctx context.Context, input *UpdateRetr
 	if input.EncryptedContentCleanupRetryEnabled != nil {
 		policy.EncryptedContentCleanupRetryEnabled = *input.EncryptedContentCleanupRetryEnabled
 	}
+	if input.EncryptedContentCleanupStickySeconds != nil {
+		policy.EncryptedContentCleanupStickySeconds = *input.EncryptedContentCleanupStickySeconds
+	}
+	if input.IgnoreCleanedUpEncryptedContentErrors != nil {
+		policy.IgnoreCleanedUpEncryptedContentErrors = *input.IgnoreCleanedUpEncryptedContentErrors
+	}
 	if input.MaxChannelRetries != nil {
 		policy.MaxChannelRetries = *input.MaxChannelRetries
 	}
@@ -1137,6 +1156,13 @@ func normalizeRetryPolicy(policy *RetryPolicy) {
 	}
 	if policy.NonStreamResponseTimeoutSeconds > maxRetryResponseTimeoutSeconds {
 		policy.NonStreamResponseTimeoutSeconds = maxRetryResponseTimeoutSeconds
+	}
+
+	if policy.EncryptedContentCleanupStickySeconds < 0 {
+		policy.EncryptedContentCleanupStickySeconds = 0
+	}
+	if policy.EncryptedContentCleanupStickySeconds > maxEncryptedContentCleanupStickySeconds {
+		policy.EncryptedContentCleanupStickySeconds = maxEncryptedContentCleanupStickySeconds
 	}
 
 	if policy.AutoDisableChannel.Statuses == nil {

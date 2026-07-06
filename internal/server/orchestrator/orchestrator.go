@@ -85,19 +85,20 @@ func NewChatCompletionOrchestrator(
 			cc.StripBillingHeaderCCH(),
 			stream.EnsureUsage(),
 		},
-		PipelineFactory:            pipeline.NewFactory(httpClient),
-		ModelMapper:                NewModelMapper(),
-		channelSelector:            defaultSelector,
-		channelLimiterManager:      channelLimiterManager,
-		channelLimiterMetrics:      channelLimiterMetrics,
-		rateLimitTracker:           rateLimitTracker,
-		adaptiveLoadBalancer:       adaptiveLoadBalancer,
-		failoverLoadBalancer:       failoverLoadBalancer,
-		circuitBreakerLoadBalancer: circuitBreakerLoadBalancer,
-		roundRobinLoadBalancer:     roundRobinLoadBalancer,
-		modelCircuitBreaker:        modelCircuitBreaker,
-		quotaProvider:              quotaProvider,
-		proxy:                      nil,
+		PipelineFactory:               pipeline.NewFactory(httpClient),
+		ModelMapper:                   NewModelMapper(),
+		channelSelector:               defaultSelector,
+		channelLimiterManager:         channelLimiterManager,
+		channelLimiterMetrics:         channelLimiterMetrics,
+		rateLimitTracker:              rateLimitTracker,
+		adaptiveLoadBalancer:          adaptiveLoadBalancer,
+		failoverLoadBalancer:          failoverLoadBalancer,
+		circuitBreakerLoadBalancer:    circuitBreakerLoadBalancer,
+		roundRobinLoadBalancer:        roundRobinLoadBalancer,
+		modelCircuitBreaker:           modelCircuitBreaker,
+		quotaProvider:                 quotaProvider,
+		encryptedContentCleanupSticky: newEncryptedContentCleanupStickyStore(),
+		proxy:                         nil,
 	}
 }
 
@@ -136,6 +137,9 @@ type ChatCompletionOrchestrator struct {
 	modelCircuitBreaker *biz.ModelCircuitBreaker
 	// The provider quota status provider for quota-aware load balancing and selection.
 	quotaProvider ProviderQuotaStatusProvider
+	// encryptedContentCleanupSticky tracks sessions that should default to cleanup
+	// after a successful cleanup special retry.
+	encryptedContentCleanupSticky *encryptedContentCleanupStickyStore
 
 	// proxy is the proxy configuration for testing
 	// If set, it will override the channel's default proxy configuration
@@ -204,18 +208,19 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 	}
 
 	state := &PersistenceState{
-		APIKey:                apiKey,
-		RequestService:        processor.RequestService,
-		UsageLogService:       processor.UsageLogService,
-		ChannelService:        processor.ChannelService,
-		PromptProvider:        processor.PromptProvider,
-		PromptProtecter:       processor.PromptProtecter,
-		RetryPolicyProvider:   processor.SystemService,
-		CandidateSelector:     processor.channelSelector,
-		LoadBalancer:          loadBalancer,
-		ModelMapper:           processor.ModelMapper,
-		Proxy:                 processor.proxy,
-		CurrentCandidateIndex: 0,
+		APIKey:                        apiKey,
+		RequestService:                processor.RequestService,
+		UsageLogService:               processor.UsageLogService,
+		ChannelService:                processor.ChannelService,
+		PromptProvider:                processor.PromptProvider,
+		PromptProtecter:               processor.PromptProtecter,
+		RetryPolicyProvider:           processor.SystemService,
+		CandidateSelector:             processor.channelSelector,
+		LoadBalancer:                  loadBalancer,
+		EncryptedContentCleanupSticky: processor.ensureEncryptedContentCleanupStickyStore(),
+		ModelMapper:                   processor.ModelMapper,
+		Proxy:                         processor.proxy,
+		CurrentCandidateIndex:         0,
 	}
 
 	var pipelineOpts []pipeline.Option
@@ -313,6 +318,8 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		persistCtx, cancel := xcontext.DetachWithTimeout(ctx, time.Second*10)
 		defer cancel()
 
+		outbound.finishPendingEncryptedContentCleanupAccounting(persistCtx, err)
+
 		// Update the last request execution status based on error if it exists
 		// This ensures that when retry fails completely, the last execution is properly marked
 		if requestExec := outbound.GetRequestExecution(); requestExec != nil {
@@ -351,4 +358,12 @@ func (processor *ChatCompletionOrchestrator) Process(ctx context.Context, reques
 		ChatCompletion:       result.Response,
 		ChatCompletionStream: nil,
 	}, nil
+}
+
+func (processor *ChatCompletionOrchestrator) ensureEncryptedContentCleanupStickyStore() *encryptedContentCleanupStickyStore {
+	if processor.encryptedContentCleanupSticky == nil {
+		processor.encryptedContentCleanupSticky = newEncryptedContentCleanupStickyStore()
+	}
+
+	return processor.encryptedContentCleanupSticky
 }

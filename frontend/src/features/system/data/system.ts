@@ -102,6 +102,8 @@ const RETRY_POLICY_QUERY = `
       enabled
       emptyResponseDetection
       encryptedContentCleanupRetryEnabled
+      encryptedContentCleanupStickySeconds
+      ignoreCleanedUpEncryptedContentErrors
       upstreamErrorPolicy {
         mode
         customMessage
@@ -354,6 +356,8 @@ export interface RetryPolicy {
   autoDisableChannel: AutoDisableChannel;
   emptyResponseDetection: boolean;
   encryptedContentCleanupRetryEnabled: boolean;
+  encryptedContentCleanupStickySeconds: number;
+  ignoreCleanedUpEncryptedContentErrors: boolean;
   upstreamErrorPolicy: UpstreamErrorPolicy;
 }
 
@@ -383,6 +387,8 @@ export interface RetryPolicyInput {
   autoDisableChannel?: AutoDisableChannelInput;
   emptyResponseDetection?: boolean;
   encryptedContentCleanupRetryEnabled?: boolean;
+  encryptedContentCleanupStickySeconds?: number;
+  ignoreCleanedUpEncryptedContentErrors?: boolean;
   upstreamErrorPolicy?: Partial<UpstreamErrorPolicy>;
 }
 

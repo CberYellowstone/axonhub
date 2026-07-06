@@ -1443,17 +1443,19 @@ type ComplexityRoot struct {
 	}
 
 	RetryPolicy struct {
-		AutoDisableChannel                  func(childComplexity int) int
-		EmptyResponseDetection              func(childComplexity int) int
-		Enabled                             func(childComplexity int) int
-		EncryptedContentCleanupRetryEnabled func(childComplexity int) int
-		LoadBalancerStrategy                func(childComplexity int) int
-		MaxChannelRetries                   func(childComplexity int) int
-		MaxSingleChannelRetries             func(childComplexity int) int
-		NonStreamResponseTimeoutSeconds     func(childComplexity int) int
-		RetryDelayMs                        func(childComplexity int) int
-		StreamFirstEventTimeoutSeconds      func(childComplexity int) int
-		UpstreamErrorPolicy                 func(childComplexity int) int
+		AutoDisableChannel                    func(childComplexity int) int
+		EmptyResponseDetection                func(childComplexity int) int
+		Enabled                               func(childComplexity int) int
+		EncryptedContentCleanupRetryEnabled   func(childComplexity int) int
+		EncryptedContentCleanupStickySeconds  func(childComplexity int) int
+		IgnoreCleanedUpEncryptedContentErrors func(childComplexity int) int
+		LoadBalancerStrategy                  func(childComplexity int) int
+		MaxChannelRetries                     func(childComplexity int) int
+		MaxSingleChannelRetries               func(childComplexity int) int
+		NonStreamResponseTimeoutSeconds       func(childComplexity int) int
+		RetryDelayMs                          func(childComplexity int) int
+		StreamFirstEventTimeoutSeconds        func(childComplexity int) int
+		UpstreamErrorPolicy                   func(childComplexity int) int
 	}
 
 	RetryableErrorPattern struct {
@@ -8648,6 +8650,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.RetryPolicy.EncryptedContentCleanupRetryEnabled(childComplexity), true
+	case "RetryPolicy.encryptedContentCleanupStickySeconds":
+		if e.complexity.RetryPolicy.EncryptedContentCleanupStickySeconds == nil {
+			break
+		}
+
+		return e.complexity.RetryPolicy.EncryptedContentCleanupStickySeconds(childComplexity), true
+	case "RetryPolicy.ignoreCleanedUpEncryptedContentErrors":
+		if e.complexity.RetryPolicy.IgnoreCleanedUpEncryptedContentErrors == nil {
+			break
+		}
+
+		return e.complexity.RetryPolicy.IgnoreCleanedUpEncryptedContentErrors(childComplexity), true
 	case "RetryPolicy.loadBalancerStrategy":
 		if e.complexity.RetryPolicy.LoadBalancerStrategy == nil {
 			break
@@ -42556,6 +42570,10 @@ func (ec *executionContext) fieldContext_Query_retryPolicy(_ context.Context, fi
 				return ec.fieldContext_RetryPolicy_enabled(ctx, field)
 			case "encryptedContentCleanupRetryEnabled":
 				return ec.fieldContext_RetryPolicy_encryptedContentCleanupRetryEnabled(ctx, field)
+			case "encryptedContentCleanupStickySeconds":
+				return ec.fieldContext_RetryPolicy_encryptedContentCleanupStickySeconds(ctx, field)
+			case "ignoreCleanedUpEncryptedContentErrors":
+				return ec.fieldContext_RetryPolicy_ignoreCleanedUpEncryptedContentErrors(ctx, field)
 			case "autoDisableChannel":
 				return ec.fieldContext_RetryPolicy_autoDisableChannel(ctx, field)
 			case "emptyResponseDetection":
@@ -46979,6 +46997,64 @@ func (ec *executionContext) _RetryPolicy_encryptedContentCleanupRetryEnabled(ctx
 }
 
 func (ec *executionContext) fieldContext_RetryPolicy_encryptedContentCleanupRetryEnabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RetryPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RetryPolicy_encryptedContentCleanupStickySeconds(ctx context.Context, field graphql.CollectedField, obj *biz.RetryPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RetryPolicy_encryptedContentCleanupStickySeconds,
+		func(ctx context.Context) (any, error) {
+			return obj.EncryptedContentCleanupStickySeconds, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RetryPolicy_encryptedContentCleanupStickySeconds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RetryPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RetryPolicy_ignoreCleanedUpEncryptedContentErrors(ctx context.Context, field graphql.CollectedField, obj *biz.RetryPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RetryPolicy_ignoreCleanedUpEncryptedContentErrors,
+		func(ctx context.Context) (any, error) {
+			return obj.IgnoreCleanedUpEncryptedContentErrors, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RetryPolicy_ignoreCleanedUpEncryptedContentErrors(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RetryPolicy",
 		Field:      field,
@@ -80421,7 +80497,7 @@ func (ec *executionContext) unmarshalInputUpdateRetryPolicyInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"maxChannelRetries", "maxSingleChannelRetries", "retryDelayMs", "streamFirstEventTimeoutSeconds", "nonStreamResponseTimeoutSeconds", "loadBalancerStrategy", "enabled", "encryptedContentCleanupRetryEnabled", "autoDisableChannel", "emptyResponseDetection", "upstreamErrorPolicy"}
+	fieldsInOrder := [...]string{"maxChannelRetries", "maxSingleChannelRetries", "retryDelayMs", "streamFirstEventTimeoutSeconds", "nonStreamResponseTimeoutSeconds", "loadBalancerStrategy", "enabled", "encryptedContentCleanupRetryEnabled", "encryptedContentCleanupStickySeconds", "ignoreCleanedUpEncryptedContentErrors", "autoDisableChannel", "emptyResponseDetection", "upstreamErrorPolicy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -80484,6 +80560,20 @@ func (ec *executionContext) unmarshalInputUpdateRetryPolicyInput(ctx context.Con
 				return it, err
 			}
 			it.EncryptedContentCleanupRetryEnabled = data
+		case "encryptedContentCleanupStickySeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("encryptedContentCleanupStickySeconds"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EncryptedContentCleanupStickySeconds = data
+		case "ignoreCleanedUpEncryptedContentErrors":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ignoreCleanedUpEncryptedContentErrors"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IgnoreCleanedUpEncryptedContentErrors = data
 		case "autoDisableChannel":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("autoDisableChannel"))
 			data, err := ec.unmarshalOAutoDisableChannelInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐAutoDisableChannel(ctx, v)
@@ -98290,6 +98380,16 @@ func (ec *executionContext) _RetryPolicy(ctx context.Context, sel ast.SelectionS
 			}
 		case "encryptedContentCleanupRetryEnabled":
 			out.Values[i] = ec._RetryPolicy_encryptedContentCleanupRetryEnabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "encryptedContentCleanupStickySeconds":
+			out.Values[i] = ec._RetryPolicy_encryptedContentCleanupStickySeconds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ignoreCleanedUpEncryptedContentErrors":
+			out.Values[i] = ec._RetryPolicy_ignoreCleanedUpEncryptedContentErrors(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
