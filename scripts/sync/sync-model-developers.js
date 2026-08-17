@@ -574,8 +574,24 @@ async function main() {
 		console.log("Sorting models by release date...");
 		sortModelsByDate(filtered);
 
+		const serialized = `${JSON.stringify(filtered, null, 2)}\n`;
 		console.log("Writing to:", OUTPUT_PATH);
-		fs.writeFileSync(OUTPUT_PATH, `${JSON.stringify(filtered, null, 2)}\n`);
+		fs.writeFileSync(OUTPUT_PATH, serialized);
+
+		const backendFallbackPath = path.join(
+			__dirname,
+			"../../internal/server/biz/catalogdata/providers.json",
+		);
+		console.log("Writing backend fallback to:", backendFallbackPath);
+		fs.writeFileSync(backendFallbackPath, serialized);
+
+		const backendModelsPath = path.join(
+			__dirname,
+			"../../internal/server/biz/catalogdata/models.json",
+		);
+		if (fs.existsSync(MODELS_JSON_PATH)) {
+			fs.copyFileSync(MODELS_JSON_PATH, backendModelsPath);
+		}
 
 		console.log("Sync completed successfully!");
 	} catch (error) {
