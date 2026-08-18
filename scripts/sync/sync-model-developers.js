@@ -582,6 +582,7 @@ async function main() {
 			__dirname,
 			"../../internal/server/biz/catalogdata/providers.json",
 		);
+		fs.mkdirSync(path.dirname(backendFallbackPath), { recursive: true });
 		console.log("Writing backend fallback to:", backendFallbackPath);
 		fs.writeFileSync(backendFallbackPath, serialized);
 

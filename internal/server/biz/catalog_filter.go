@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/samber/lo"
 )
 
 // DefaultDeveloperIDs mirrors frontend/src/features/models/data/constants.ts.
@@ -90,6 +92,23 @@ func allowedSet(ids []string) map[string]struct{} {
 	return out
 }
 
+func sortedStringKeys[V any](in map[string]V) []string {
+	keys := lo.Keys(in)
+	sort.Strings(keys)
+
+	return keys
+}
+
+func modelsFromIDMap(merged map[string]map[string]any) []map[string]any {
+	keys := sortedStringKeys(merged)
+	models := make([]map[string]any, 0, len(keys))
+	for _, key := range keys {
+		models = append(models, merged[key])
+	}
+
+	return models
+}
+
 func filterCatalogProviders(data catalogFile, allowedIDs []string) catalogFile {
 	allowed := allowedSet(allowedIDs)
 	filtered := catalogFile{Providers: map[string]catalogProvider{}}
@@ -167,7 +186,8 @@ func aggregateIBMGranite(data catalogFile, filtered *catalogFile) {
 	seen := map[string]struct{}{}
 	models := make([]map[string]any, 0)
 
-	for _, provider := range data.Providers {
+	for _, key := range sortedStringKeys(data.Providers) {
+		provider := data.Providers[key]
 		for _, model := range provider.Models {
 			id := strings.ToLower(modelString(model, "id"))
 			if id == "" {
@@ -271,10 +291,7 @@ func mergeTencentPlans(data catalogFile, filtered *catalogFile) {
 		return
 	}
 
-	models := make([]map[string]any, 0, len(merged))
-	for _, model := range merged {
-		models = append(models, model)
-	}
+	models := modelsFromIDMap(merged)
 
 	provider := cloneProvider(base)
 	provider.ID = "tencent"
@@ -320,10 +337,7 @@ func mergeXiaomiTokenPlans(data catalogFile, filtered *catalogFile) {
 		return
 	}
 
-	models := make([]map[string]any, 0, len(merged))
-	for _, model := range merged {
-		models = append(models, model)
-	}
+	models := modelsFromIDMap(merged)
 
 	provider := cloneProvider(base)
 	provider.ID = "xiaomi"
@@ -364,7 +378,8 @@ func isKATFamilyModel(model map[string]any) bool {
 func buildKWAIPilotProvider(data catalogFile) *catalogProvider {
 	byID := map[string]map[string]any{}
 
-	for _, provider := range data.Providers {
+	for _, key := range sortedStringKeys(data.Providers) {
+		provider := data.Providers[key]
 		for _, model := range provider.Models {
 			if !isKATFamilyModel(model) {
 				continue
@@ -394,10 +409,7 @@ func buildKWAIPilotProvider(data catalogFile) *catalogProvider {
 		return nil
 	}
 
-	models := make([]map[string]any, 0, len(byID))
-	for _, model := range byID {
-		models = append(models, model)
-	}
+	models := modelsFromIDMap(byID)
 
 	return &catalogProvider{
 		ID:          "kwaipilot",
@@ -548,6 +560,10 @@ func sortModelsByReleaseDate(models []map[string]any) {
 			right = time.Time{}
 		}
 
-		return left.After(right)
+		if !left.Equal(right) {
+			return left.After(right)
+		}
+
+		return modelString(models[i], "id") < modelString(models[j], "id")
 	})
 }

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/looplj/axonhub/internal/log"
 	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/server/scheduler"
@@ -52,6 +54,7 @@ type CatalogService struct {
 
 	mu    sync.RWMutex
 	cache *catalogCache
+	sf    singleflight.Group
 }
 
 func NewCatalogService(system *SystemService, httpClient *httpclient.HttpClient) *CatalogService {
@@ -70,6 +73,12 @@ func (s *CatalogService) RegisterScheduledTasks(ctx context.Context, sched *sche
 	}
 
 	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Error(context.Background(), "initial catalog refresh panicked", log.Any("panic", rec))
+			}
+		}()
+
 		if _, err := s.Refresh(context.Background()); err != nil {
 			log.Warn(context.Background(), "initial catalog refresh failed", log.Cause(err))
 		}
@@ -109,42 +118,78 @@ func (s *CatalogService) Snapshot(ctx context.Context, filtered bool) (CatalogSn
 
 func (s *CatalogService) Refresh(ctx context.Context) (CatalogSnapshot, error) {
 	settings := s.system.CatalogSettingsOrDefault(ctx)
-	raw, err := s.fetchUpstream(ctx, settings.EffectiveUpstreamURL())
-	if err != nil {
-		return CatalogSnapshot{}, err
-	}
-
-	s.storeCache(raw, catalogSourceUpstream)
-
-	return s.snapshotFromCache(s.cached(), true)
-}
-
-func (s *CatalogService) ensureCache(ctx context.Context) *catalogCache {
-	if cached := s.cached(); cached != nil {
-		settings := s.system.CatalogSettingsOrDefault(ctx)
-		if time.Since(cached.fetchedAt) < time.Duration(settings.RefreshSeconds)*time.Second {
-			return cached
-		}
-	}
-
-	settings := s.system.CatalogSettingsOrDefault(ctx)
 
 	fetchCtx, cancel := context.WithTimeout(ctx, catalogFetchTimeout)
 	defer cancel()
 
 	raw, err := s.fetchUpstream(fetchCtx, settings.EffectiveUpstreamURL())
 	if err != nil {
-		log.Warn(ctx, "catalog fetch failed, using fallback", log.Cause(err))
-		if cached := s.cached(); cached != nil {
-			return cached
-		}
-
-		return s.fallbackCache()
+		return CatalogSnapshot{}, err
 	}
 
-	s.storeCache(raw, catalogSourceUpstream)
+	return s.snapshotFromCache(s.storeCache(raw, catalogSourceUpstream), true)
+}
 
-	return s.cached()
+func (s *CatalogService) ensureCache(ctx context.Context) *catalogCache {
+	settings := s.system.CatalogSettingsOrDefault(ctx)
+	if cached := s.freshCache(settings); cached != nil {
+		return cached
+	}
+
+	value, err, _ := s.sf.Do("catalog-refresh", func() (any, error) {
+		settings := s.system.CatalogSettingsOrDefault(ctx)
+		if cached := s.freshCache(settings); cached != nil {
+			return cached, nil
+		}
+
+		fetchCtx, cancel := context.WithTimeout(ctx, catalogFetchTimeout)
+		defer cancel()
+
+		raw, err := s.fetchUpstream(fetchCtx, settings.EffectiveUpstreamURL())
+		if err != nil {
+			log.Warn(ctx, "catalog fetch failed, using fallback", log.Cause(err))
+			if cached := s.cached(); cached != nil {
+				return cached, nil
+			}
+
+			fallback := s.fallbackCache()
+
+			return s.storeCache(fallback.raw, catalogSourceFallback), nil
+		}
+
+		return s.storeCache(raw, catalogSourceUpstream), nil
+	})
+	if err != nil {
+		return s.fallbackOrCached()
+	}
+
+	cache, ok := value.(*catalogCache)
+	if !ok || cache == nil {
+		return s.fallbackOrCached()
+	}
+
+	return cache
+}
+
+func (s *CatalogService) freshCache(settings CatalogSettings) *catalogCache {
+	cached := s.cached()
+	if cached == nil {
+		return nil
+	}
+
+	if time.Since(cached.fetchedAt) >= time.Duration(settings.RefreshSeconds)*time.Second {
+		return nil
+	}
+
+	return cached
+}
+
+func (s *CatalogService) fallbackOrCached() *catalogCache {
+	if cached := s.cached(); cached != nil {
+		return cached
+	}
+
+	return s.fallbackCache()
 }
 
 func (s *CatalogService) fetchUpstream(ctx context.Context, upstreamURL string) (catalogFile, error) {
@@ -180,6 +225,10 @@ func (s *CatalogService) fetchUpstream(ctx context.Context, upstreamURL string) 
 }
 
 func (s *CatalogService) snapshotFromCache(cache *catalogCache, filtered bool) (CatalogSnapshot, error) {
+	if cache == nil {
+		cache = s.fallbackOrCached()
+	}
+
 	data := cache.raw
 	if filtered {
 		prepared := filterCatalogProviders(data, DefaultDeveloperIDs)
@@ -209,7 +258,7 @@ func (s *CatalogService) snapshotFromCache(cache *catalogCache, filtered bool) (
 	}, nil
 }
 
-func (s *CatalogService) storeCache(raw catalogFile, source string) {
+func (s *CatalogService) storeCache(raw catalogFile, source string) *catalogCache {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -218,6 +267,8 @@ func (s *CatalogService) storeCache(raw catalogFile, source string) {
 		fetchedAt: time.Now().UTC(),
 		source:    source,
 	}
+
+	return s.cache
 }
 
 func (s *CatalogService) cached() *catalogCache {

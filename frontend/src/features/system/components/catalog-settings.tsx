@@ -10,6 +10,21 @@ import { Label } from '@/components/ui/label';
 import { useRefreshProvidersCatalog } from '@/features/models/data/providers';
 import { useCatalogSettings, useUpdateCatalogSettings } from '../data/system';
 
+const MIN_CATALOG_REFRESH_SECONDS = 60;
+const MAX_CATALOG_REFRESH_SECONDS = 604800;
+
+function parseRefreshSeconds(value: string): number {
+  return Number.parseInt(value, 10);
+}
+
+function isValidRefreshSeconds(value: number): boolean {
+  return Number.isInteger(value) && value >= MIN_CATALOG_REFRESH_SECONDS && value <= MAX_CATALOG_REFRESH_SECONDS;
+}
+
+function clampRefreshSeconds(value: number): number {
+  return Math.min(MAX_CATALOG_REFRESH_SECONDS, Math.max(MIN_CATALOG_REFRESH_SECONDS, value));
+}
+
 export function CatalogSettings() {
   const { t } = useTranslation();
   const { data, isLoading } = useCatalogSettings();
@@ -17,6 +32,7 @@ export function CatalogSettings() {
   const refreshCatalog = useRefreshProvidersCatalog();
   const [upstreamURL, setUpstreamURL] = useState('');
   const [refreshSeconds, setRefreshSeconds] = useState(3600);
+  const canSave = Boolean(data) && isValidRefreshSeconds(refreshSeconds) && !updateSettings.isPending;
 
   useEffect(() => {
     if (!data) {
@@ -36,9 +52,13 @@ export function CatalogSettings() {
   }
 
   const handleSave = async () => {
+    if (!data || !isValidRefreshSeconds(refreshSeconds)) {
+      return;
+    }
+
     await updateSettings.mutateAsync({
       upstreamURL: upstreamURL.trim(),
-      refreshSeconds,
+      refreshSeconds: clampRefreshSeconds(refreshSeconds),
     });
   };
 
@@ -64,15 +84,24 @@ export function CatalogSettings() {
           <Input
             id='catalog-refresh-seconds'
             type='number'
-            min={60}
-            max={604800}
-            value={refreshSeconds}
-            onChange={(event) => setRefreshSeconds(Number(event.target.value) || 3600)}
+            min={MIN_CATALOG_REFRESH_SECONDS}
+            max={MAX_CATALOG_REFRESH_SECONDS}
+            step={1}
+            value={Number.isInteger(refreshSeconds) ? refreshSeconds : ''}
+            onChange={(event) => {
+              const parsed = parseRefreshSeconds(event.target.value);
+              setRefreshSeconds(Number.isNaN(parsed) ? Number.NaN : parsed);
+            }}
+            onBlur={() => {
+              if (Number.isInteger(refreshSeconds)) {
+                setRefreshSeconds(clampRefreshSeconds(refreshSeconds));
+              }
+            }}
           />
           <p className='text-muted-foreground text-sm'>{t('system.catalog.refreshSeconds.description')}</p>
         </div>
         <div className='flex flex-wrap gap-2'>
-          <Button onClick={handleSave} disabled={updateSettings.isPending}>
+          <Button onClick={handleSave} disabled={!canSave}>
             {updateSettings.isPending ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Save className='mr-2 h-4 w-4' />}
             {t('system.buttons.save')}
           </Button>

@@ -441,6 +441,10 @@ func (r *queryResolver) PreviewGcCleanup(ctx context.Context, input gc.TriggerGc
 
 // ProvidersCatalog is the resolver for the providersCatalog field.
 func (r *queryResolver) ProvidersCatalog(ctx context.Context, filtered *bool) (*ProvidersCatalog, error) {
+	if !scopes.UserHasScope(ctx, scopes.ScopeReadChannels) {
+		return nil, fmt.Errorf("permission denied: requires read_channels scope")
+	}
+
 	if r.catalogService == nil {
 		return nil, fmt.Errorf("catalog service is not configured")
 	}
@@ -460,6 +464,10 @@ func (r *queryResolver) ProvidersCatalog(ctx context.Context, filtered *bool) (*
 
 // CatalogSettings is the resolver for the catalogSettings field.
 func (r *queryResolver) CatalogSettings(ctx context.Context) (*biz.CatalogSettings, error) {
+	if !scopes.UserHasScope(ctx, scopes.ScopeReadSettings) {
+		return nil, fmt.Errorf("permission denied: requires read_settings scope")
+	}
+
 	settings, err := r.systemService.CatalogSettings(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get catalog settings: %w", err)
