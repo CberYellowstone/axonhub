@@ -138,7 +138,7 @@ func TestFilterCatalogProviders_DeterministicOrder(t *testing.T) {
 
 	var encoded string
 	var filtered catalogFile
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		filtered = filterCatalogProviders(input, DefaultDeveloperIDs)
 		sortCatalogModels(&filtered)
 		raw, err := json.Marshal(filtered)

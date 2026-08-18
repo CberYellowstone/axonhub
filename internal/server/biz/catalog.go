@@ -2,7 +2,6 @@ package biz
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
+
+	_ "embed"
 
 	"github.com/looplj/axonhub/internal/log"
 	"github.com/looplj/axonhub/internal/objects"
@@ -72,15 +73,16 @@ func (s *CatalogService) RegisterScheduledTasks(ctx context.Context, sched *sche
 		return err
 	}
 
+	refreshCtx := context.WithoutCancel(ctx)
 	go func() {
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Error(context.Background(), "initial catalog refresh panicked", log.Any("panic", rec))
+				log.Error(refreshCtx, "initial catalog refresh panicked", log.Any("panic", rec))
 			}
 		}()
 
-		if _, err := s.Refresh(context.Background()); err != nil {
-			log.Warn(context.Background(), "initial catalog refresh failed", log.Cause(err))
+		if _, err := s.Refresh(refreshCtx); err != nil {
+			log.Warn(refreshCtx, "initial catalog refresh failed", log.Cause(err))
 		}
 	}()
 
