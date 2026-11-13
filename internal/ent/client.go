@@ -17,6 +17,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/looplj/axonhub/internal/ent/apikey"
 	"github.com/looplj/axonhub/internal/ent/apikeyprofiletemplate"
+	"github.com/looplj/axonhub/internal/ent/apikeysuspension"
 	"github.com/looplj/axonhub/internal/ent/channel"
 	"github.com/looplj/axonhub/internal/ent/channelmodelprice"
 	"github.com/looplj/axonhub/internal/ent/channelmodelpriceversion"
@@ -27,6 +28,8 @@ import (
 	"github.com/looplj/axonhub/internal/ent/model"
 	"github.com/looplj/axonhub/internal/ent/oidcidentity"
 	"github.com/looplj/axonhub/internal/ent/plugin"
+	"github.com/looplj/axonhub/internal/ent/pluginnotification"
+	"github.com/looplj/axonhub/internal/ent/pluginschedule"
 	"github.com/looplj/axonhub/internal/ent/pluginstorage"
 	"github.com/looplj/axonhub/internal/ent/project"
 	"github.com/looplj/axonhub/internal/ent/prompt"
@@ -53,6 +56,8 @@ type Client struct {
 	APIKey *APIKeyClient
 	// APIKeyProfileTemplate is the client for interacting with the APIKeyProfileTemplate builders.
 	APIKeyProfileTemplate *APIKeyProfileTemplateClient
+	// APIKeySuspension is the client for interacting with the APIKeySuspension builders.
+	APIKeySuspension *APIKeySuspensionClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
 	// ChannelModelPrice is the client for interacting with the ChannelModelPrice builders.
@@ -73,6 +78,10 @@ type Client struct {
 	OIDCIdentity *OIDCIdentityClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
+	// PluginNotification is the client for interacting with the PluginNotification builders.
+	PluginNotification *PluginNotificationClient
+	// PluginSchedule is the client for interacting with the PluginSchedule builders.
+	PluginSchedule *PluginScheduleClient
 	// PluginStorage is the client for interacting with the PluginStorage builders.
 	PluginStorage *PluginStorageClient
 	// Project is the client for interacting with the Project builders.
@@ -118,6 +127,7 @@ func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.APIKey = NewAPIKeyClient(c.config)
 	c.APIKeyProfileTemplate = NewAPIKeyProfileTemplateClient(c.config)
+	c.APIKeySuspension = NewAPIKeySuspensionClient(c.config)
 	c.Channel = NewChannelClient(c.config)
 	c.ChannelModelPrice = NewChannelModelPriceClient(c.config)
 	c.ChannelModelPriceVersion = NewChannelModelPriceVersionClient(c.config)
@@ -128,6 +138,8 @@ func (c *Client) init() {
 	c.Model = NewModelClient(c.config)
 	c.OIDCIdentity = NewOIDCIdentityClient(c.config)
 	c.Plugin = NewPluginClient(c.config)
+	c.PluginNotification = NewPluginNotificationClient(c.config)
+	c.PluginSchedule = NewPluginScheduleClient(c.config)
 	c.PluginStorage = NewPluginStorageClient(c.config)
 	c.Project = NewProjectClient(c.config)
 	c.Prompt = NewPromptClient(c.config)
@@ -237,6 +249,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		config:                   cfg,
 		APIKey:                   NewAPIKeyClient(cfg),
 		APIKeyProfileTemplate:    NewAPIKeyProfileTemplateClient(cfg),
+		APIKeySuspension:         NewAPIKeySuspensionClient(cfg),
 		Channel:                  NewChannelClient(cfg),
 		ChannelModelPrice:        NewChannelModelPriceClient(cfg),
 		ChannelModelPriceVersion: NewChannelModelPriceVersionClient(cfg),
@@ -247,6 +260,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Model:                    NewModelClient(cfg),
 		OIDCIdentity:             NewOIDCIdentityClient(cfg),
 		Plugin:                   NewPluginClient(cfg),
+		PluginNotification:       NewPluginNotificationClient(cfg),
+		PluginSchedule:           NewPluginScheduleClient(cfg),
 		PluginStorage:            NewPluginStorageClient(cfg),
 		Project:                  NewProjectClient(cfg),
 		Prompt:                   NewPromptClient(cfg),
@@ -283,6 +298,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		config:                   cfg,
 		APIKey:                   NewAPIKeyClient(cfg),
 		APIKeyProfileTemplate:    NewAPIKeyProfileTemplateClient(cfg),
+		APIKeySuspension:         NewAPIKeySuspensionClient(cfg),
 		Channel:                  NewChannelClient(cfg),
 		ChannelModelPrice:        NewChannelModelPriceClient(cfg),
 		ChannelModelPriceVersion: NewChannelModelPriceVersionClient(cfg),
@@ -293,6 +309,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Model:                    NewModelClient(cfg),
 		OIDCIdentity:             NewOIDCIdentityClient(cfg),
 		Plugin:                   NewPluginClient(cfg),
+		PluginNotification:       NewPluginNotificationClient(cfg),
+		PluginSchedule:           NewPluginScheduleClient(cfg),
 		PluginStorage:            NewPluginStorageClient(cfg),
 		Project:                  NewProjectClient(cfg),
 		Prompt:                   NewPromptClient(cfg),
@@ -337,12 +355,13 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.APIKey, c.APIKeyProfileTemplate, c.Channel, c.ChannelModelPrice,
-		c.ChannelModelPriceVersion, c.ChannelOverrideTemplate, c.ChannelProbe,
-		c.DataStorage, c.Invitation, c.Model, c.OIDCIdentity, c.Plugin,
-		c.PluginStorage, c.Project, c.Prompt, c.PromptProtectionRule,
-		c.ProviderQuotaStatus, c.Request, c.RequestExecution, c.Role, c.System,
-		c.Thread, c.Trace, c.UsageLog, c.User, c.UserProject, c.UserRole,
+		c.APIKey, c.APIKeyProfileTemplate, c.APIKeySuspension, c.Channel,
+		c.ChannelModelPrice, c.ChannelModelPriceVersion, c.ChannelOverrideTemplate,
+		c.ChannelProbe, c.DataStorage, c.Invitation, c.Model, c.OIDCIdentity, c.Plugin,
+		c.PluginNotification, c.PluginSchedule, c.PluginStorage, c.Project, c.Prompt,
+		c.PromptProtectionRule, c.ProviderQuotaStatus, c.Request, c.RequestExecution,
+		c.Role, c.System, c.Thread, c.Trace, c.UsageLog, c.User, c.UserProject,
+		c.UserRole,
 	} {
 		n.Use(hooks...)
 	}
@@ -352,12 +371,13 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.APIKey, c.APIKeyProfileTemplate, c.Channel, c.ChannelModelPrice,
-		c.ChannelModelPriceVersion, c.ChannelOverrideTemplate, c.ChannelProbe,
-		c.DataStorage, c.Invitation, c.Model, c.OIDCIdentity, c.Plugin,
-		c.PluginStorage, c.Project, c.Prompt, c.PromptProtectionRule,
-		c.ProviderQuotaStatus, c.Request, c.RequestExecution, c.Role, c.System,
-		c.Thread, c.Trace, c.UsageLog, c.User, c.UserProject, c.UserRole,
+		c.APIKey, c.APIKeyProfileTemplate, c.APIKeySuspension, c.Channel,
+		c.ChannelModelPrice, c.ChannelModelPriceVersion, c.ChannelOverrideTemplate,
+		c.ChannelProbe, c.DataStorage, c.Invitation, c.Model, c.OIDCIdentity, c.Plugin,
+		c.PluginNotification, c.PluginSchedule, c.PluginStorage, c.Project, c.Prompt,
+		c.PromptProtectionRule, c.ProviderQuotaStatus, c.Request, c.RequestExecution,
+		c.Role, c.System, c.Thread, c.Trace, c.UsageLog, c.User, c.UserProject,
+		c.UserRole,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -370,6 +390,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.APIKey.mutate(ctx, m)
 	case *APIKeyProfileTemplateMutation:
 		return c.APIKeyProfileTemplate.mutate(ctx, m)
+	case *APIKeySuspensionMutation:
+		return c.APIKeySuspension.mutate(ctx, m)
 	case *ChannelMutation:
 		return c.Channel.mutate(ctx, m)
 	case *ChannelModelPriceMutation:
@@ -390,6 +412,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OIDCIdentity.mutate(ctx, m)
 	case *PluginMutation:
 		return c.Plugin.mutate(ctx, m)
+	case *PluginNotificationMutation:
+		return c.PluginNotification.mutate(ctx, m)
+	case *PluginScheduleMutation:
+		return c.PluginSchedule.mutate(ctx, m)
 	case *PluginStorageMutation:
 		return c.PluginStorage.mutate(ctx, m)
 	case *ProjectMutation:
@@ -756,6 +782,140 @@ func (c *APIKeyProfileTemplateClient) mutate(ctx context.Context, m *APIKeyProfi
 		return (&APIKeyProfileTemplateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown APIKeyProfileTemplate mutation op: %q", m.Op())
+	}
+}
+
+// APIKeySuspensionClient is a client for the APIKeySuspension schema.
+type APIKeySuspensionClient struct {
+	config
+}
+
+// NewAPIKeySuspensionClient returns a client for the APIKeySuspension from the given config.
+func NewAPIKeySuspensionClient(c config) *APIKeySuspensionClient {
+	return &APIKeySuspensionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `apikeysuspension.Hooks(f(g(h())))`.
+func (c *APIKeySuspensionClient) Use(hooks ...Hook) {
+	c.hooks.APIKeySuspension = append(c.hooks.APIKeySuspension, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `apikeysuspension.Intercept(f(g(h())))`.
+func (c *APIKeySuspensionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.APIKeySuspension = append(c.inters.APIKeySuspension, interceptors...)
+}
+
+// Create returns a builder for creating a APIKeySuspension entity.
+func (c *APIKeySuspensionClient) Create() *APIKeySuspensionCreate {
+	mutation := newAPIKeySuspensionMutation(c.config, OpCreate)
+	return &APIKeySuspensionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of APIKeySuspension entities.
+func (c *APIKeySuspensionClient) CreateBulk(builders ...*APIKeySuspensionCreate) *APIKeySuspensionCreateBulk {
+	return &APIKeySuspensionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *APIKeySuspensionClient) MapCreateBulk(slice any, setFunc func(*APIKeySuspensionCreate, int)) *APIKeySuspensionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &APIKeySuspensionCreateBulk{err: fmt.Errorf("calling to APIKeySuspensionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*APIKeySuspensionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &APIKeySuspensionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for APIKeySuspension.
+func (c *APIKeySuspensionClient) Update() *APIKeySuspensionUpdate {
+	mutation := newAPIKeySuspensionMutation(c.config, OpUpdate)
+	return &APIKeySuspensionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *APIKeySuspensionClient) UpdateOne(_m *APIKeySuspension) *APIKeySuspensionUpdateOne {
+	mutation := newAPIKeySuspensionMutation(c.config, OpUpdateOne, withAPIKeySuspension(_m))
+	return &APIKeySuspensionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *APIKeySuspensionClient) UpdateOneID(id int) *APIKeySuspensionUpdateOne {
+	mutation := newAPIKeySuspensionMutation(c.config, OpUpdateOne, withAPIKeySuspensionID(id))
+	return &APIKeySuspensionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for APIKeySuspension.
+func (c *APIKeySuspensionClient) Delete() *APIKeySuspensionDelete {
+	mutation := newAPIKeySuspensionMutation(c.config, OpDelete)
+	return &APIKeySuspensionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *APIKeySuspensionClient) DeleteOne(_m *APIKeySuspension) *APIKeySuspensionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *APIKeySuspensionClient) DeleteOneID(id int) *APIKeySuspensionDeleteOne {
+	builder := c.Delete().Where(apikeysuspension.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &APIKeySuspensionDeleteOne{builder}
+}
+
+// Query returns a query builder for APIKeySuspension.
+func (c *APIKeySuspensionClient) Query() *APIKeySuspensionQuery {
+	return &APIKeySuspensionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAPIKeySuspension},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a APIKeySuspension entity by its id.
+func (c *APIKeySuspensionClient) Get(ctx context.Context, id int) (*APIKeySuspension, error) {
+	return c.Query().Where(apikeysuspension.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *APIKeySuspensionClient) GetX(ctx context.Context, id int) *APIKeySuspension {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *APIKeySuspensionClient) Hooks() []Hook {
+	hooks := c.hooks.APIKeySuspension
+	return append(hooks[:len(hooks):len(hooks)], apikeysuspension.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *APIKeySuspensionClient) Interceptors() []Interceptor {
+	return c.inters.APIKeySuspension
+}
+
+func (c *APIKeySuspensionClient) mutate(ctx context.Context, m *APIKeySuspensionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&APIKeySuspensionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&APIKeySuspensionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&APIKeySuspensionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&APIKeySuspensionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown APIKeySuspension mutation op: %q", m.Op())
 	}
 }
 
@@ -2343,6 +2503,274 @@ func (c *PluginClient) mutate(ctx context.Context, m *PluginMutation) (Value, er
 		return (&PluginDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Plugin mutation op: %q", m.Op())
+	}
+}
+
+// PluginNotificationClient is a client for the PluginNotification schema.
+type PluginNotificationClient struct {
+	config
+}
+
+// NewPluginNotificationClient returns a client for the PluginNotification from the given config.
+func NewPluginNotificationClient(c config) *PluginNotificationClient {
+	return &PluginNotificationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pluginnotification.Hooks(f(g(h())))`.
+func (c *PluginNotificationClient) Use(hooks ...Hook) {
+	c.hooks.PluginNotification = append(c.hooks.PluginNotification, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `pluginnotification.Intercept(f(g(h())))`.
+func (c *PluginNotificationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PluginNotification = append(c.inters.PluginNotification, interceptors...)
+}
+
+// Create returns a builder for creating a PluginNotification entity.
+func (c *PluginNotificationClient) Create() *PluginNotificationCreate {
+	mutation := newPluginNotificationMutation(c.config, OpCreate)
+	return &PluginNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PluginNotification entities.
+func (c *PluginNotificationClient) CreateBulk(builders ...*PluginNotificationCreate) *PluginNotificationCreateBulk {
+	return &PluginNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PluginNotificationClient) MapCreateBulk(slice any, setFunc func(*PluginNotificationCreate, int)) *PluginNotificationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PluginNotificationCreateBulk{err: fmt.Errorf("calling to PluginNotificationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PluginNotificationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PluginNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PluginNotification.
+func (c *PluginNotificationClient) Update() *PluginNotificationUpdate {
+	mutation := newPluginNotificationMutation(c.config, OpUpdate)
+	return &PluginNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PluginNotificationClient) UpdateOne(_m *PluginNotification) *PluginNotificationUpdateOne {
+	mutation := newPluginNotificationMutation(c.config, OpUpdateOne, withPluginNotification(_m))
+	return &PluginNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PluginNotificationClient) UpdateOneID(id int) *PluginNotificationUpdateOne {
+	mutation := newPluginNotificationMutation(c.config, OpUpdateOne, withPluginNotificationID(id))
+	return &PluginNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PluginNotification.
+func (c *PluginNotificationClient) Delete() *PluginNotificationDelete {
+	mutation := newPluginNotificationMutation(c.config, OpDelete)
+	return &PluginNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PluginNotificationClient) DeleteOne(_m *PluginNotification) *PluginNotificationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PluginNotificationClient) DeleteOneID(id int) *PluginNotificationDeleteOne {
+	builder := c.Delete().Where(pluginnotification.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PluginNotificationDeleteOne{builder}
+}
+
+// Query returns a query builder for PluginNotification.
+func (c *PluginNotificationClient) Query() *PluginNotificationQuery {
+	return &PluginNotificationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePluginNotification},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PluginNotification entity by its id.
+func (c *PluginNotificationClient) Get(ctx context.Context, id int) (*PluginNotification, error) {
+	return c.Query().Where(pluginnotification.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PluginNotificationClient) GetX(ctx context.Context, id int) *PluginNotification {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PluginNotificationClient) Hooks() []Hook {
+	hooks := c.hooks.PluginNotification
+	return append(hooks[:len(hooks):len(hooks)], pluginnotification.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *PluginNotificationClient) Interceptors() []Interceptor {
+	return c.inters.PluginNotification
+}
+
+func (c *PluginNotificationClient) mutate(ctx context.Context, m *PluginNotificationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PluginNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PluginNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PluginNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PluginNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PluginNotification mutation op: %q", m.Op())
+	}
+}
+
+// PluginScheduleClient is a client for the PluginSchedule schema.
+type PluginScheduleClient struct {
+	config
+}
+
+// NewPluginScheduleClient returns a client for the PluginSchedule from the given config.
+func NewPluginScheduleClient(c config) *PluginScheduleClient {
+	return &PluginScheduleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pluginschedule.Hooks(f(g(h())))`.
+func (c *PluginScheduleClient) Use(hooks ...Hook) {
+	c.hooks.PluginSchedule = append(c.hooks.PluginSchedule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `pluginschedule.Intercept(f(g(h())))`.
+func (c *PluginScheduleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PluginSchedule = append(c.inters.PluginSchedule, interceptors...)
+}
+
+// Create returns a builder for creating a PluginSchedule entity.
+func (c *PluginScheduleClient) Create() *PluginScheduleCreate {
+	mutation := newPluginScheduleMutation(c.config, OpCreate)
+	return &PluginScheduleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PluginSchedule entities.
+func (c *PluginScheduleClient) CreateBulk(builders ...*PluginScheduleCreate) *PluginScheduleCreateBulk {
+	return &PluginScheduleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PluginScheduleClient) MapCreateBulk(slice any, setFunc func(*PluginScheduleCreate, int)) *PluginScheduleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PluginScheduleCreateBulk{err: fmt.Errorf("calling to PluginScheduleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PluginScheduleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PluginScheduleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PluginSchedule.
+func (c *PluginScheduleClient) Update() *PluginScheduleUpdate {
+	mutation := newPluginScheduleMutation(c.config, OpUpdate)
+	return &PluginScheduleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PluginScheduleClient) UpdateOne(_m *PluginSchedule) *PluginScheduleUpdateOne {
+	mutation := newPluginScheduleMutation(c.config, OpUpdateOne, withPluginSchedule(_m))
+	return &PluginScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PluginScheduleClient) UpdateOneID(id int) *PluginScheduleUpdateOne {
+	mutation := newPluginScheduleMutation(c.config, OpUpdateOne, withPluginScheduleID(id))
+	return &PluginScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PluginSchedule.
+func (c *PluginScheduleClient) Delete() *PluginScheduleDelete {
+	mutation := newPluginScheduleMutation(c.config, OpDelete)
+	return &PluginScheduleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PluginScheduleClient) DeleteOne(_m *PluginSchedule) *PluginScheduleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PluginScheduleClient) DeleteOneID(id int) *PluginScheduleDeleteOne {
+	builder := c.Delete().Where(pluginschedule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PluginScheduleDeleteOne{builder}
+}
+
+// Query returns a query builder for PluginSchedule.
+func (c *PluginScheduleClient) Query() *PluginScheduleQuery {
+	return &PluginScheduleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePluginSchedule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PluginSchedule entity by its id.
+func (c *PluginScheduleClient) Get(ctx context.Context, id int) (*PluginSchedule, error) {
+	return c.Query().Where(pluginschedule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PluginScheduleClient) GetX(ctx context.Context, id int) *PluginSchedule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PluginScheduleClient) Hooks() []Hook {
+	hooks := c.hooks.PluginSchedule
+	return append(hooks[:len(hooks):len(hooks)], pluginschedule.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *PluginScheduleClient) Interceptors() []Interceptor {
+	return c.inters.PluginSchedule
+}
+
+func (c *PluginScheduleClient) mutate(ctx context.Context, m *PluginScheduleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PluginScheduleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PluginScheduleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PluginScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PluginScheduleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PluginSchedule mutation op: %q", m.Op())
 	}
 }
 
@@ -5084,17 +5512,19 @@ func (c *UserRoleClient) mutate(ctx context.Context, m *UserRoleMutation) (Value
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		APIKey, APIKeyProfileTemplate, Channel, ChannelModelPrice,
+		APIKey, APIKeyProfileTemplate, APIKeySuspension, Channel, ChannelModelPrice,
 		ChannelModelPriceVersion, ChannelOverrideTemplate, ChannelProbe, DataStorage,
-		Invitation, Model, OIDCIdentity, Plugin, PluginStorage, Project, Prompt,
-		PromptProtectionRule, ProviderQuotaStatus, Request, RequestExecution, Role,
-		System, Thread, Trace, UsageLog, User, UserProject, UserRole []ent.Hook
+		Invitation, Model, OIDCIdentity, Plugin, PluginNotification, PluginSchedule,
+		PluginStorage, Project, Prompt, PromptProtectionRule, ProviderQuotaStatus,
+		Request, RequestExecution, Role, System, Thread, Trace, UsageLog, User,
+		UserProject, UserRole []ent.Hook
 	}
 	inters struct {
-		APIKey, APIKeyProfileTemplate, Channel, ChannelModelPrice,
+		APIKey, APIKeyProfileTemplate, APIKeySuspension, Channel, ChannelModelPrice,
 		ChannelModelPriceVersion, ChannelOverrideTemplate, ChannelProbe, DataStorage,
-		Invitation, Model, OIDCIdentity, Plugin, PluginStorage, Project, Prompt,
-		PromptProtectionRule, ProviderQuotaStatus, Request, RequestExecution, Role,
-		System, Thread, Trace, UsageLog, User, UserProject, UserRole []ent.Interceptor
+		Invitation, Model, OIDCIdentity, Plugin, PluginNotification, PluginSchedule,
+		PluginStorage, Project, Prompt, PromptProtectionRule, ProviderQuotaStatus,
+		Request, RequestExecution, Role, System, Thread, Trace, UsageLog, User,
+		UserProject, UserRole []ent.Interceptor
 	}
 )

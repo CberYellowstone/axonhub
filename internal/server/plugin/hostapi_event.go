@@ -37,6 +37,13 @@ func permissionSet(names []string) map[string]struct{} {
 
 func (h *hostCall) attachEventAPI(ctxObj *moejs.Object) error {
 	if h.export != onEventExport {
+		if h.export == "onSchedule" {
+			webhook := h.rt.Realm().NewObject()
+			if err := defineHostFn(h.rt, webhook, "send", 2, h.webhookSend); err != nil {
+				return err
+			}
+			return defineValue(h.rt, ctxObj, "webhook", engine.ObjectValue(webhook))
+		}
 		return nil
 	}
 	realm := h.rt.Realm()

@@ -253,6 +253,26 @@ func (_u *PluginUpdate) ClearConfig() *PluginUpdate {
 	return _u
 }
 
+// SetAutomationScope sets the "automation_scope" field.
+func (_u *PluginUpdate) SetAutomationScope(v objects.PluginAutomationScope) *PluginUpdate {
+	_u.mutation.SetAutomationScope(v)
+	return _u
+}
+
+// SetNillableAutomationScope sets the "automation_scope" field if the given value is not nil.
+func (_u *PluginUpdate) SetNillableAutomationScope(v *objects.PluginAutomationScope) *PluginUpdate {
+	if v != nil {
+		_u.SetAutomationScope(*v)
+	}
+	return _u
+}
+
+// ClearAutomationScope clears the value of the "automation_scope" field.
+func (_u *PluginUpdate) ClearAutomationScope() *PluginUpdate {
+	_u.mutation.ClearAutomationScope()
+	return _u
+}
+
 // Mutation returns the PluginMutation object of the builder.
 func (_u *PluginUpdate) Mutation() *PluginMutation {
 	return _u.mutation
@@ -325,6 +345,11 @@ func (_u *PluginUpdate) check() error {
 	if v, ok := _u.mutation.PackageSha256(); ok {
 		if err := plugin.PackageSha256Validator(v); err != nil {
 			return &ValidationError{Name: "package_sha256", err: fmt.Errorf(`ent: validator failed for field "Plugin.package_sha256": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.AutomationScope(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "automation_scope", err: fmt.Errorf(`ent: validator failed for field "Plugin.automation_scope": %w`, err)}
 		}
 	}
 	return nil
@@ -429,6 +454,12 @@ func (_u *PluginUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ConfigCleared() {
 		_spec.ClearField(plugin.FieldConfig, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.AutomationScope(); ok {
+		_spec.SetField(plugin.FieldAutomationScope, field.TypeJSON, value)
+	}
+	if _u.mutation.AutomationScopeCleared() {
+		_spec.ClearField(plugin.FieldAutomationScope, field.TypeJSON)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
@@ -674,6 +705,26 @@ func (_u *PluginUpdateOne) ClearConfig() *PluginUpdateOne {
 	return _u
 }
 
+// SetAutomationScope sets the "automation_scope" field.
+func (_u *PluginUpdateOne) SetAutomationScope(v objects.PluginAutomationScope) *PluginUpdateOne {
+	_u.mutation.SetAutomationScope(v)
+	return _u
+}
+
+// SetNillableAutomationScope sets the "automation_scope" field if the given value is not nil.
+func (_u *PluginUpdateOne) SetNillableAutomationScope(v *objects.PluginAutomationScope) *PluginUpdateOne {
+	if v != nil {
+		_u.SetAutomationScope(*v)
+	}
+	return _u
+}
+
+// ClearAutomationScope clears the value of the "automation_scope" field.
+func (_u *PluginUpdateOne) ClearAutomationScope() *PluginUpdateOne {
+	_u.mutation.ClearAutomationScope()
+	return _u
+}
+
 // Mutation returns the PluginMutation object of the builder.
 func (_u *PluginUpdateOne) Mutation() *PluginMutation {
 	return _u.mutation
@@ -759,6 +810,11 @@ func (_u *PluginUpdateOne) check() error {
 	if v, ok := _u.mutation.PackageSha256(); ok {
 		if err := plugin.PackageSha256Validator(v); err != nil {
 			return &ValidationError{Name: "package_sha256", err: fmt.Errorf(`ent: validator failed for field "Plugin.package_sha256": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.AutomationScope(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "automation_scope", err: fmt.Errorf(`ent: validator failed for field "Plugin.automation_scope": %w`, err)}
 		}
 	}
 	return nil
@@ -880,6 +936,12 @@ func (_u *PluginUpdateOne) sqlSave(ctx context.Context) (_node *Plugin, err erro
 	}
 	if _u.mutation.ConfigCleared() {
 		_spec.ClearField(plugin.FieldConfig, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.AutomationScope(); ok {
+		_spec.SetField(plugin.FieldAutomationScope, field.TypeJSON, value)
+	}
+	if _u.mutation.AutomationScopeCleared() {
+		_spec.ClearField(plugin.FieldAutomationScope, field.TypeJSON)
 	}
 	_spec.AddModifiers(_u.modifiers...)
 	_node = &Plugin{config: _u.config}

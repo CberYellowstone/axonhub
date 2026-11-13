@@ -1,3 +1,12 @@
+// 职责: 维护插件管理 GraphQL 读写契约、授权预览及查询刷新。
+// 关联文件:
+//   frontend/src/features/plugins/components/plugin-grant-dialog.tsx
+//   frontend/src/features/plugins/components/plugin-detail-sheet.tsx
+//   internal/server/gql/plugin.graphql
+//   internal/server/gql/plugin_automation.graphql
+//   frontend/src/locales/en/plugins.json
+//   frontend/src/locales/zh-CN/plugins.json
+// 注意事项: 共享字段片段覆盖查询和写入回显；自动化范围独立于权限授权，空项目默认拒绝。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphqlRequest } from '@/gql/graphql';
 import { toast } from 'sonner';
@@ -19,6 +28,11 @@ const PLUGIN_FIELDS = `
   manifestPermissions
   grantedNetwork
   manifestNetwork
+  manifestSchedules { key intervalSeconds }
+  requiredCapabilities
+  automationScope {
+    projects { projectId allKeys apiKeyIds excludedApiKeyIds }
+  }
   manifestHooks {
     request { enabled requestTypes }
     attempt { enabled apiFormats }
@@ -72,6 +86,8 @@ const INSTALL_PLUGIN_MUTATION = `
         hooks
         pages
         actions
+        schedules
+        requiredCapabilities
       }
     }
   }
@@ -136,6 +152,8 @@ const INSTALL_PLUGIN_FROM_MARKET_MUTATION = `
         hooks
         pages
         actions
+        schedules
+        requiredCapabilities
       }
     }
   }
@@ -183,6 +201,22 @@ export interface PluginManifestHooks {
   attempt: PluginManifestAttemptHook | null;
 }
 
+export interface PluginScheduleSpec {
+  key: string;
+  intervalSeconds: number;
+}
+
+export interface PluginProjectAccess {
+  projectId: number;
+  allKeys: boolean;
+  apiKeyIds: number[];
+  excludedApiKeyIds: number[];
+}
+
+export interface PluginAutomationScope {
+  projects: PluginProjectAccess[];
+}
+
 export interface Plugin {
   id: string;
   pluginID: string;
@@ -197,6 +231,9 @@ export interface Plugin {
   grantedNetwork: string[];
   manifestNetwork: string[];
   manifestHooks: PluginManifestHooks;
+  manifestSchedules: PluginScheduleSpec[];
+  requiredCapabilities: string[];
+  automationScope: PluginAutomationScope;
   configFields: PluginConfigField[];
   config: Record<string, unknown>;
   runtimeStatus: string;
@@ -225,6 +262,8 @@ export interface PluginUpgradePreview {
   hooks: string[];
   pages: string[];
   actions: string[];
+  schedules: string[];
+  requiredCapabilities: string[];
 }
 
 export interface PluginInstallResult {
@@ -287,7 +326,9 @@ export async function installPlugin(
   if (!response.headers.get('content-type')?.includes('application/json')) {
     throw failure();
   }
-  const result = await response.json().catch(() => { throw failure(); });
+  const result = await response.json().catch(() => {
+    throw failure();
+  });
   if (result.errors?.length) {
     throw new Error(result.errors[0].message);
   }
@@ -356,15 +397,8 @@ export function useInstallPluginFromMarket() {
 export function useEnablePlugin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      id,
-      grantedPermissions,
-      grantedNetwork,
-    }: {
-      id: string;
-      grantedPermissions: string[];
-      grantedNetwork: string[];
-    }) => graphqlRequest<{ enablePlugin: Plugin }>(ENABLE_PLUGIN_MUTATION, { id, grantedPermissions, grantedNetwork }),
+    mutationFn: ({ id, grantedPermissions, grantedNetwork }: { id: string; grantedPermissions: string[]; grantedNetwork: string[] }) =>
+      graphqlRequest<{ enablePlugin: Plugin }>(ENABLE_PLUGIN_MUTATION, { id, grantedPermissions, grantedNetwork }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       queryClient.invalidateQueries({ queryKey: ['pluginMarket'] });

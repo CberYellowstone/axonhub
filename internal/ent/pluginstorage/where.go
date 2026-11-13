@@ -84,6 +84,11 @@ func Value(v string) predicate.PluginStorage {
 	return predicate.PluginStorage(sql.FieldEQ(FieldValue, v))
 }
 
+// Revision applies equality check predicate on the "revision" field. It's identical to RevisionEQ.
+func Revision(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldEQ(FieldRevision, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.PluginStorage {
 	return predicate.PluginStorage(sql.FieldEQ(FieldExpiresAt, v))
@@ -402,6 +407,71 @@ func ValueEqualFold(v string) predicate.PluginStorage {
 // ValueContainsFold applies the ContainsFold predicate on the "value" field.
 func ValueContainsFold(v string) predicate.PluginStorage {
 	return predicate.PluginStorage(sql.FieldContainsFold(FieldValue, v))
+}
+
+// RevisionEQ applies the EQ predicate on the "revision" field.
+func RevisionEQ(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldEQ(FieldRevision, v))
+}
+
+// RevisionNEQ applies the NEQ predicate on the "revision" field.
+func RevisionNEQ(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldNEQ(FieldRevision, v))
+}
+
+// RevisionIn applies the In predicate on the "revision" field.
+func RevisionIn(vs ...string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldIn(FieldRevision, vs...))
+}
+
+// RevisionNotIn applies the NotIn predicate on the "revision" field.
+func RevisionNotIn(vs ...string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldNotIn(FieldRevision, vs...))
+}
+
+// RevisionGT applies the GT predicate on the "revision" field.
+func RevisionGT(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldGT(FieldRevision, v))
+}
+
+// RevisionGTE applies the GTE predicate on the "revision" field.
+func RevisionGTE(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldGTE(FieldRevision, v))
+}
+
+// RevisionLT applies the LT predicate on the "revision" field.
+func RevisionLT(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldLT(FieldRevision, v))
+}
+
+// RevisionLTE applies the LTE predicate on the "revision" field.
+func RevisionLTE(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldLTE(FieldRevision, v))
+}
+
+// RevisionContains applies the Contains predicate on the "revision" field.
+func RevisionContains(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldContains(FieldRevision, v))
+}
+
+// RevisionHasPrefix applies the HasPrefix predicate on the "revision" field.
+func RevisionHasPrefix(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldHasPrefix(FieldRevision, v))
+}
+
+// RevisionHasSuffix applies the HasSuffix predicate on the "revision" field.
+func RevisionHasSuffix(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldHasSuffix(FieldRevision, v))
+}
+
+// RevisionEqualFold applies the EqualFold predicate on the "revision" field.
+func RevisionEqualFold(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldEqualFold(FieldRevision, v))
+}
+
+// RevisionContainsFold applies the ContainsFold predicate on the "revision" field.
+func RevisionContainsFold(v string) predicate.PluginStorage {
+	return predicate.PluginStorage(sql.FieldContainsFold(FieldRevision, v))
 }
 
 // ExpiresAtEQ applies the EQ predicate on the "expires_at" field.

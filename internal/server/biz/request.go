@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
 	"github.com/eko/gocache/lib/v4/store"
 	"github.com/tidwall/gjson"
 
@@ -625,6 +627,13 @@ func setRequestChannel(upd *ent.RequestUpdate, req *ent.Request) *ent.RequestUpd
 // Use the authorized mutation predicates for that host read, including privacy
 // filters, without requiring the writer to also have query permission.
 func (s *RequestService) saveRequestUpdate(ctx context.Context, id int, upd *ent.RequestUpdate) error {
+	if status, set := upd.Mutation().Status(); set && status == request.StatusCompleted {
+		// Complete and timestamp in one statement. A retry or later content update
+		// must never move the first successful completion used for cache sampling.
+		upd.Modify(func(u *sql.UpdateBuilder) {
+			u.Set(request.FieldCompletedAt, sql.Expr("COALESCE("+request.FieldCompletedAt+", "+requestCompletionClockSQL(u.Dialect())+")"))
+		})
+	}
 	count, err := upd.Where(request.ID(id)).Save(ctx)
 	if err != nil || count > 0 {
 		return err
@@ -639,6 +648,19 @@ func (s *RequestService) saveRequestUpdate(ctx context.Context, id int, upd *ent
 		return fmt.Errorf("request %d: %w", id, &ent.NotFoundError{})
 	}
 	return nil
+}
+
+func requestCompletionClockSQL(dialectName string) string {
+	switch dialectName {
+	case dialect.Postgres:
+		return "clock_timestamp()"
+	case dialect.MySQL:
+		return "UTC_TIMESTAMP(6)"
+	default:
+		// Match modernc's default UTC time.String binding (trimmed fraction), so
+		// inclusive indexed comparisons also work at an exact completion boundary.
+		return "RTRIM(RTRIM(STRFTIME('%Y-%m-%d %H:%M:%f', 'now'), '0'), '.') || ' +0000 UTC'"
+	}
 }
 
 // saveRequestExecutionUpdate is the execution counterpart of saveRequestUpdate.

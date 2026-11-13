@@ -82,6 +82,20 @@ func (_c *PluginStorageCreate) SetValue(v string) *PluginStorageCreate {
 	return _c
 }
 
+// SetRevision sets the "revision" field.
+func (_c *PluginStorageCreate) SetRevision(v string) *PluginStorageCreate {
+	_c.mutation.SetRevision(v)
+	return _c
+}
+
+// SetNillableRevision sets the "revision" field if the given value is not nil.
+func (_c *PluginStorageCreate) SetNillableRevision(v *string) *PluginStorageCreate {
+	if v != nil {
+		_c.SetRevision(*v)
+	}
+	return _c
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_c *PluginStorageCreate) SetExpiresAt(v time.Time) *PluginStorageCreate {
 	_c.mutation.SetExpiresAt(v)
@@ -151,6 +165,10 @@ func (_c *PluginStorageCreate) defaults() error {
 		v := pluginstorage.DefaultNamespace
 		_c.mutation.SetNamespace(v)
 	}
+	if _, ok := _c.mutation.Revision(); !ok {
+		v := pluginstorage.DefaultRevision
+		_c.mutation.SetRevision(v)
+	}
 	return nil
 }
 
@@ -182,6 +200,14 @@ func (_c *PluginStorageCreate) check() error {
 	}
 	if _, ok := _c.mutation.Value(); !ok {
 		return &ValidationError{Name: "value", err: errors.New(`ent: missing required field "PluginStorage.value"`)}
+	}
+	if _, ok := _c.mutation.Revision(); !ok {
+		return &ValidationError{Name: "revision", err: errors.New(`ent: missing required field "PluginStorage.revision"`)}
+	}
+	if v, ok := _c.mutation.Revision(); ok {
+		if err := pluginstorage.RevisionValidator(v); err != nil {
+			return &ValidationError{Name: "revision", err: fmt.Errorf(`ent: validator failed for field "PluginStorage.revision": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -233,6 +259,10 @@ func (_c *PluginStorageCreate) createSpec() (*PluginStorage, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.Value(); ok {
 		_spec.SetField(pluginstorage.FieldValue, field.TypeString, value)
 		_node.Value = value
+	}
+	if value, ok := _c.mutation.Revision(); ok {
+		_spec.SetField(pluginstorage.FieldRevision, field.TypeString, value)
+		_node.Revision = value
 	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(pluginstorage.FieldExpiresAt, field.TypeTime, value)
@@ -335,6 +365,18 @@ func (u *PluginStorageUpsert) SetValue(v string) *PluginStorageUpsert {
 // UpdateValue sets the "value" field to the value that was provided on create.
 func (u *PluginStorageUpsert) UpdateValue() *PluginStorageUpsert {
 	u.SetExcluded(pluginstorage.FieldValue)
+	return u
+}
+
+// SetRevision sets the "revision" field.
+func (u *PluginStorageUpsert) SetRevision(v string) *PluginStorageUpsert {
+	u.Set(pluginstorage.FieldRevision, v)
+	return u
+}
+
+// UpdateRevision sets the "revision" field to the value that was provided on create.
+func (u *PluginStorageUpsert) UpdateRevision() *PluginStorageUpsert {
+	u.SetExcluded(pluginstorage.FieldRevision)
 	return u
 }
 
@@ -457,6 +499,20 @@ func (u *PluginStorageUpsertOne) SetValue(v string) *PluginStorageUpsertOne {
 func (u *PluginStorageUpsertOne) UpdateValue() *PluginStorageUpsertOne {
 	return u.Update(func(s *PluginStorageUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetRevision sets the "revision" field.
+func (u *PluginStorageUpsertOne) SetRevision(v string) *PluginStorageUpsertOne {
+	return u.Update(func(s *PluginStorageUpsert) {
+		s.SetRevision(v)
+	})
+}
+
+// UpdateRevision sets the "revision" field to the value that was provided on create.
+func (u *PluginStorageUpsertOne) UpdateRevision() *PluginStorageUpsertOne {
+	return u.Update(func(s *PluginStorageUpsert) {
+		s.UpdateRevision()
 	})
 }
 
@@ -748,6 +804,20 @@ func (u *PluginStorageUpsertBulk) SetValue(v string) *PluginStorageUpsertBulk {
 func (u *PluginStorageUpsertBulk) UpdateValue() *PluginStorageUpsertBulk {
 	return u.Update(func(s *PluginStorageUpsert) {
 		s.UpdateValue()
+	})
+}
+
+// SetRevision sets the "revision" field.
+func (u *PluginStorageUpsertBulk) SetRevision(v string) *PluginStorageUpsertBulk {
+	return u.Update(func(s *PluginStorageUpsert) {
+		s.SetRevision(v)
+	})
+}
+
+// UpdateRevision sets the "revision" field to the value that was provided on create.
+func (u *PluginStorageUpsertBulk) UpdateRevision() *PluginStorageUpsertBulk {
+	return u.Update(func(s *PluginStorageUpsert) {
+		s.UpdateRevision()
 	})
 }
 

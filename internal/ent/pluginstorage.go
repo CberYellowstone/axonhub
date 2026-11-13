@@ -29,6 +29,8 @@ type PluginStorage struct {
 	Key string `json:"key,omitempty"`
 	// UTF-8 value, at most 256 KiB. Empty string is valid. MySQL uses mediumtext.
 	Value string `json:"value,omitempty"`
+	// Opaque CAS token. Empty identifies a legacy row; every new write replaces it.
+	Revision string `json:"revision,omitempty"`
 	// Null means the row does not expire.
 	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
 	selectValues sql.SelectValues
@@ -41,7 +43,7 @@ func (*PluginStorage) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case pluginstorage.FieldID, pluginstorage.FieldInstallationID:
 			values[i] = new(sql.NullInt64)
-		case pluginstorage.FieldNamespace, pluginstorage.FieldKey, pluginstorage.FieldValue:
+		case pluginstorage.FieldNamespace, pluginstorage.FieldKey, pluginstorage.FieldValue, pluginstorage.FieldRevision:
 			values[i] = new(sql.NullString)
 		case pluginstorage.FieldCreatedAt, pluginstorage.FieldUpdatedAt, pluginstorage.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -101,6 +103,12 @@ func (_m *PluginStorage) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field value", values[i])
 			} else if value.Valid {
 				_m.Value = value.String
+			}
+		case pluginstorage.FieldRevision:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field revision", values[i])
+			} else if value.Valid {
+				_m.Revision = value.String
 			}
 		case pluginstorage.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -162,6 +170,9 @@ func (_m *PluginStorage) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("value=")
 	builder.WriteString(_m.Value)
+	builder.WriteString(", ")
+	builder.WriteString("revision=")
+	builder.WriteString(_m.Revision)
 	builder.WriteString(", ")
 	if v := _m.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")

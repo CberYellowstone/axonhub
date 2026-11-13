@@ -1,21 +1,21 @@
+// 职责: 展示插件权限授权与升级新增契约，强调阻断 Key 等高风险权限。
+// 关联文件:
+//   frontend/src/features/plugins/data/plugins.ts
+//   frontend/src/features/plugins/hooks/use-plugin-grant-flow.ts
+//   frontend/src/locales/en/plugins.json
+//   frontend/src/locales/zh-CN/plugins.json
+// 注意事项: 宿主能力要求不是可授予权限；升级预览只标记新增项。
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IconAlertTriangle, IconArrowRight } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Plugin, PluginUpgradePreview } from '../data/plugins';
 import type { PluginGrantMode } from '../hooks/use-plugin-grant-flow';
 import { PluginAvatar } from './plugin-visuals';
@@ -96,12 +96,15 @@ export function PluginGrantDialog({
   const newPermissions = new Set(showPreview ? (preview.permissions ?? []) : []);
   const newNetwork = new Set(showPreview ? (preview.network ?? []) : []);
   const hasWrite = permissions.some((permission) => permission.startsWith('write_'));
+  const hasKeySuspensions = permissions.includes('manage_key_suspensions');
   const otherAdditions = showPreview
     ? [
         { label: t('plugins.grant.addedEvents'), items: preview.events ?? [] },
         { label: t('plugins.grant.addedHooks'), items: preview.hooks ?? [] },
         { label: t('plugins.grant.addedPages'), items: preview.pages ?? [] },
         { label: t('plugins.grant.addedActions'), items: preview.actions ?? [] },
+        { label: t('plugins.grant.addedSchedules'), items: preview.schedules ?? [] },
+        { label: t('plugins.grant.addedRequiredCapabilities'), items: preview.requiredCapabilities ?? [] },
       ].filter((group) => group.items.length > 0)
     : [];
 
@@ -122,12 +125,16 @@ export function PluginGrantDialog({
               {[
                 { label: t('plugins.hooks.request'), hook: manifestHooks.request, scope: manifestHooks.request?.requestTypes },
                 { label: t('plugins.hooks.attempt'), hook: manifestHooks.attempt, scope: manifestHooks.attempt?.apiFormats },
-              ].filter((entry) => entry.hook).map((entry) => (
-                <div key={entry.label}>
-                  <span>{entry.label} · {t(entry.hook?.enabled ? 'plugins.hooks.enabled' : 'plugins.hooks.disabled')}</span>
-                  <p className='text-muted-foreground break-words'>{entry.scope?.join(', ') || t('plugins.none')}</p>
-                </div>
-              ))}
+              ]
+                .filter((entry) => entry.hook)
+                .map((entry) => (
+                  <div key={entry.label}>
+                    <span>
+                      {entry.label} · {t(entry.hook?.enabled ? 'plugins.hooks.enabled' : 'plugins.hooks.disabled')}
+                    </span>
+                    <p className='text-muted-foreground break-words'>{entry.scope?.join(', ') || t('plugins.none')}</p>
+                  </div>
+                ))}
             </div>
           )}
           {showPreview && (
@@ -155,14 +162,18 @@ export function PluginGrantDialog({
             </div>
           )}
 
-          {(hasWrite || network.length > 0) && (
+          {(hasWrite || hasKeySuspensions || network.length > 0) && (
             <Alert variant='destructive'>
               <IconAlertTriangle />
               <AlertDescription>
                 {hasWrite && <p>{t('plugins.grant.writeWarning')}</p>}
+                {hasKeySuspensions && <p>{t('plugins.grant.keySuspensionWarning')}</p>}
                 {network.length > 0 && <p>{t('plugins.grant.networkWarning')}</p>}
               </AlertDescription>
             </Alert>
+          )}
+          {permissions.includes('read_usage_metrics') && (
+            <p className='text-muted-foreground text-sm'>{t('plugins.grant.usageMetricsHint')}</p>
           )}
 
           <GrantSection
@@ -174,6 +185,7 @@ export function PluginGrantDialog({
           >
             {permissions.map((permission) => {
               const writePermission = permission.startsWith('write_');
+              const keySuspensionPermission = permission === 'manage_key_suspensions';
               const inputID = `plugin-grant-${permission}`;
               return (
                 <GrantItem
@@ -181,11 +193,17 @@ export function PluginGrantDialog({
                   id={inputID}
                   checked={selected.includes(permission)}
                   disabled={pending}
-                  danger={writePermission}
+                  danger={writePermission || keySuspensionPermission}
                   isNew={newPermissions.has(permission)}
                   onCheckedChange={(checked) => setSelected((current) => toggle(current, permission, checked))}
                   label={permission}
-                  hint={writePermission ? t('plugins.grant.writeAccess') : undefined}
+                  hint={
+                    keySuspensionPermission
+                      ? t('plugins.grant.keySuspensionAccess')
+                      : writePermission
+                        ? t('plugins.grant.writeAccess')
+                        : undefined
+                  }
                 />
               );
             })}

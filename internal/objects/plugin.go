@@ -1,3 +1,10 @@
+// 职责: 定义并严格解码插件 manifest、权限声明与周期调度配置。
+// 关联文件:
+//
+//	internal/server/plugin/manifest.go
+//	internal/server/plugin/scheduler.go
+//
+// 注意事项: manifest 保持 schemaVersion/pluginApiVersion 兼容；未知字段及重复对象键拒绝解析。
 package objects
 
 import (
@@ -44,20 +51,22 @@ var (
 	pageKeyPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
 	manifestFieldNames = map[string]struct{}{
-		"schemaVersion":    {},
-		"id":               {},
-		"name":             {},
-		"version":          {},
-		"description":      {},
-		"axonhubVersion":   {},
-		"pluginApiVersion": {},
-		"permissions":      {},
-		"network":          {},
-		"events":           {},
-		"hooks":            {},
-		"configSchema":     {},
-		"ui":               {},
-		"providers":        {},
+		"schemaVersion":        {},
+		"id":                   {},
+		"name":                 {},
+		"version":              {},
+		"description":          {},
+		"axonhubVersion":       {},
+		"pluginApiVersion":     {},
+		"permissions":          {},
+		"network":              {},
+		"events":               {},
+		"hooks":                {},
+		"configSchema":         {},
+		"ui":                   {},
+		"providers":            {},
+		"schedules":            {},
+		"requiredCapabilities": {},
 	}
 	hookFieldNames = map[string]struct{}{
 		"request":     {},
@@ -110,23 +119,48 @@ var (
 // Closed fields are recorded as presence flags so a later check can reject
 // them with a dedicated error. Their structure is intentionally not defined.
 type PluginManifest struct {
-	SchemaVersion       int                 `json:"schemaVersion,omitempty"`
-	SchemaVersionSet    bool                `json:"-"`
-	ID                  string              `json:"id,omitempty"`
-	Name                string              `json:"name,omitempty"`
-	Version             string              `json:"version,omitempty"`
-	Description         string              `json:"description,omitempty"`
-	AxonhubVersion      string              `json:"axonhubVersion,omitempty"`
-	PluginAPIVersion    int                 `json:"pluginApiVersion,omitempty"`
-	PluginAPIVersionSet bool                `json:"-"`
-	Permissions         []string            `json:"permissions,omitempty"`
-	Network             []PluginNetworkRule `json:"network,omitempty"`
-	Events              []string            `json:"events,omitempty"`
-	EventsPresent       bool                `json:"-"`
-	Hooks               *PluginHooksSpec    `json:"hooks,omitempty"`
-	ConfigSchema        *PluginConfigSchema `json:"configSchema,omitempty"`
-	UI                  *PluginUI           `json:"ui,omitempty"`
-	ProvidersPresent    bool                `json:"-"`
+	SchemaVersion        int                  `json:"schemaVersion,omitempty"`
+	SchemaVersionSet     bool                 `json:"-"`
+	ID                   string               `json:"id,omitempty"`
+	Name                 string               `json:"name,omitempty"`
+	Version              string               `json:"version,omitempty"`
+	Description          string               `json:"description,omitempty"`
+	AxonhubVersion       string               `json:"axonhubVersion,omitempty"`
+	PluginAPIVersion     int                  `json:"pluginApiVersion,omitempty"`
+	PluginAPIVersionSet  bool                 `json:"-"`
+	Permissions          []string             `json:"permissions,omitempty"`
+	Network              []PluginNetworkRule  `json:"network,omitempty"`
+	Events               []string             `json:"events,omitempty"`
+	EventsPresent        bool                 `json:"-"`
+	Hooks                *PluginHooksSpec     `json:"hooks,omitempty"`
+	ConfigSchema         *PluginConfigSchema  `json:"configSchema,omitempty"`
+	UI                   *PluginUI            `json:"ui,omitempty"`
+	ProvidersPresent     bool                 `json:"-"`
+	Schedules            []PluginScheduleSpec `json:"schedules,omitempty"`
+	RequiredCapabilities []string             `json:"requiredCapabilities,omitempty"`
+}
+
+// PluginScheduleSpec declares one durable, coalescing periodic job.
+type PluginScheduleSpec struct {
+	Key             string `json:"key"`
+	IntervalSeconds int    `json:"intervalSeconds"`
+}
+
+func (s *PluginScheduleSpec) UnmarshalJSON(data []byte) error {
+	obj, err := decodeObject(data, "schedule")
+	if err != nil {
+		return err
+	}
+	if err := rejectUnknownFields(obj, map[string]struct{}{"key": {}, "intervalSeconds": {}}, "schedule"); err != nil {
+		return err
+	}
+	if s.Key, err = decodeJSONString(obj["key"], "schedule.key"); err != nil {
+		return err
+	}
+	if s.IntervalSeconds, err = decodeJSONInt(obj["intervalSeconds"], "schedule.intervalSeconds"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // PluginNetworkRule is one manifest.network entry.
@@ -301,6 +335,32 @@ func (m *PluginManifest) Validate() error {
 	}
 	if err := m.validateNetwork(); err != nil {
 		return err
+	}
+	if len(m.Schedules) > 8 {
+		return errors.New("schedules must have at most 8 entries")
+	}
+	seenSchedules := map[string]bool{}
+	for _, schedule := range m.Schedules {
+		if !pageKeyPattern.MatchString(schedule.Key) {
+			return fmt.Errorf("schedule key %q must match %s", schedule.Key, pageKeyPattern.String())
+		}
+		if seenSchedules[schedule.Key] {
+			return fmt.Errorf("schedule key %q is duplicated", schedule.Key)
+		}
+		seenSchedules[schedule.Key] = true
+		if schedule.IntervalSeconds < 60 || schedule.IntervalSeconds > 86400 {
+			return errors.New("schedule intervalSeconds must be between 60 and 86400")
+		}
+	}
+	seenCapabilities := map[string]bool{}
+	for _, capability := range m.RequiredCapabilities {
+		if capability == "" || len(capability) > 128 || strings.TrimSpace(capability) != capability {
+			return errors.New("requiredCapabilities entries must be non-empty bounded identifiers")
+		}
+		if seenCapabilities[capability] {
+			return fmt.Errorf("required capability %q is duplicated", capability)
+		}
+		seenCapabilities[capability] = true
 	}
 	return nil
 }
@@ -739,6 +799,8 @@ func decodeTitleLanguages(data []byte) ([]pluginTitleLang, error) {
 
 // UnmarshalJSON decodes a manifest with an explicit field whitelist.
 func (m *PluginManifest) UnmarshalJSON(data []byte) error {
+	m.Schedules = nil
+	m.RequiredCapabilities = nil
 	obj, err := decodeObject(data, "")
 	if err != nil {
 		return err
@@ -820,6 +882,22 @@ func (m *PluginManifest) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		m.Events = values
+	}
+	if raw, ok := obj["requiredCapabilities"]; ok {
+		values, err := decodeJSONStringSlice(raw, "requiredCapabilities")
+		if err != nil {
+			return err
+		}
+		m.RequiredCapabilities = values
+	}
+	if raw, ok := obj["schedules"]; ok {
+		trimmed := bytes.TrimSpace(raw)
+		if len(trimmed) == 0 || trimmed[0] != '[' {
+			return errors.New("schedules must be an array")
+		}
+		if err := json.Unmarshal(raw, &m.Schedules); err != nil {
+			return err
+		}
 	}
 	if _, ok := obj["providers"]; ok {
 		m.ProvidersPresent = true
@@ -1158,15 +1236,28 @@ func (p *PluginConfigProperty) unmarshalJSONAt(data []byte, fieldPath string) er
 
 func decodeObject(data []byte, fieldPath string) (map[string]json.RawMessage, error) {
 	data = bytes.TrimSpace(data)
-	if len(data) == 0 || bytes.Equal(data, []byte("null")) || data[0] != '{' {
+	if len(data) == 0 || bytes.Equal(data, []byte("null")) || data[0] != '{' || !json.Valid(data) {
 		return nil, objectRequired(fieldPath)
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if _, err := decoder.Token(); err != nil {
 		return nil, objectRequired(fieldPath)
 	}
-	if raw == nil {
-		raw = map[string]json.RawMessage{}
+	raw := map[string]json.RawMessage{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return nil, objectRequired(fieldPath)
+		}
+		key := token.(string)
+		if _, exists := raw[key]; exists {
+			return nil, fmt.Errorf("%s field %q is duplicated", fieldPath, key)
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, objectRequired(fieldPath)
+		}
+		raw[key] = value
 	}
 	return raw, nil
 }

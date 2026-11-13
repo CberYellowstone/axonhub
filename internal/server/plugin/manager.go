@@ -1,3 +1,12 @@
+// 职责: 管理插件安装、运行代际与事件/持久调度的生命周期。
+// 关联文件:
+//
+//	internal/server/plugin/scheduler.go
+//	internal/server/plugin/dispatcher.go
+//	internal/server/plugin/view.go
+//	internal/server/plugin/manifest.go
+//
+// 注意事项: 资源由 generation 引用计数释放；定时调用的副作用须实时验证安装 revision 和租约。
 package plugin
 
 import (
@@ -36,6 +45,7 @@ import (
 	"github.com/looplj/axonhub/internal/pkg/xcache/live"
 	"github.com/looplj/axonhub/internal/pkg/xerrors"
 	"github.com/looplj/axonhub/internal/pkg/xredis"
+	"github.com/looplj/axonhub/internal/scopes"
 	"github.com/looplj/axonhub/internal/server/biz"
 	"github.com/looplj/axonhub/internal/server/events"
 )
@@ -80,6 +90,7 @@ var pluginMetaColumns = []string{
 	entplugin.FieldGrantedPermissions,
 	entplugin.FieldGrantedNetwork,
 	entplugin.FieldConfig,
+	entplugin.FieldAutomationScope,
 }
 
 // RuntimeStatus is this process's view of one plugin. It is not stored.
@@ -103,14 +114,16 @@ type RuntimeStatusEntry struct {
 // rules, events, hooks, pages, or actions.
 // Nothing is written until a later Install submits the full new grant.
 type UpgradePreview struct {
-	CurrentVersion string
-	NewVersion     string
-	Permissions    []string
-	Network        []string
-	Events         []string
-	Hooks          []string
-	Pages          []string
-	Actions        []string
+	CurrentVersion       string
+	NewVersion           string
+	Permissions          []string
+	Network              []string
+	Events               []string
+	Hooks                []string
+	Pages                []string
+	Actions              []string
+	Schedules            []string
+	RequiredCapabilities []string
 }
 
 // InstallResult is a new or upgraded row, or a preview that left the current row running.
@@ -168,6 +181,7 @@ type Manager struct {
 	channels       *biz.ChannelService
 	webhooks       *biz.WebhookNotifier
 	dispatcher     *eventDispatcher
+	scheduler      *durableScheduler
 
 	// kvNow is the clock for KV expiry. Nil means time.Now.
 	// Tests in this package may set it.
@@ -271,6 +285,7 @@ func newManager(params ManagerParams, cfg managerConfig) (*Manager, error) {
 		webhooks:        params.Webhooks,
 	}
 	manager.callsCond = sync.NewCond(&manager.callsMu)
+	manager.scheduler = newDurableScheduler(manager)
 	if manager.countersUseRedis() {
 		redisClient, err := xredis.NewClient(params.Cache.Redis)
 		if err != nil {
@@ -331,6 +346,7 @@ func (m *Manager) Start(ctx context.Context) error {
 		return err
 	}
 	m.syncBuiltins(ctx, nil, m.Current())
+	m.scheduler.start()
 	return nil
 }
 
@@ -347,6 +363,9 @@ func (m *Manager) stop(ctx context.Context) error {
 	m.callsMu.Lock()
 	m.stopping = true
 	m.callsMu.Unlock()
+	if m.scheduler != nil {
+		m.scheduler.stop()
+	}
 	if m.dispatcher != nil {
 		m.dispatcher.close()
 	}
@@ -651,6 +670,9 @@ func (m *Manager) Enable(ctx context.Context, id int, granted []string, grantedN
 		if err := checkConfigForEnable(row.Manifest.ConfigSchema, row.Config); err != nil {
 			return err
 		}
+		if err := checkRequiredCapabilities(row.Manifest.RequiredCapabilities); err != nil {
+			return err
+		}
 		normalized, err := permissionsSubset(granted, row.Manifest.Permissions)
 		if err != nil {
 			return err
@@ -689,11 +711,15 @@ func (m *Manager) Disable(ctx context.Context, id int) error {
 // UpdateSettings validates config against the stored schema and saves priority and config.
 // An enabled plugin must keep every required field set; a disabled one may save partial config.
 func (m *Manager) UpdateSettings(ctx context.Context, id int, priority int, config map[string]any) error {
+	directOwner := scopes.IsDirectOwner(ctx)
 	ctx = authz.WithSystemBypass(ctx, pluginBypassReason)
 	err := m.runInTx(ctx, func(txCtx context.Context) error {
 		row, err := m.oneRecord(txCtx, id)
 		if err != nil {
 			return err
+		}
+		if slices.Contains(row.Granted, objects.PluginPermissionKeySuspensions) && !directOwner {
+			return errors.New("only a direct owner may modify key suspension automation settings")
 		}
 		config = keepSecretValues(row.Manifest.ConfigSchema, row.Config, config)
 		if err := validateStoredConfig(row.Manifest.ConfigSchema, config); err != nil {
@@ -821,6 +847,9 @@ func (m *Manager) onSwap(old, next *Generation) {
 	if m.dispatcher != nil {
 		m.dispatcher.sync(next)
 	}
+	if m.scheduler != nil {
+		m.scheduler.wake()
+	}
 }
 
 func (m *Manager) retire(gen *Generation) {
@@ -905,6 +934,9 @@ func (m *Manager) buildGeneration(ctx context.Context, current *Generation) (*Ge
 }
 
 func (m *Manager) resourceFor(ctx context.Context, row pluginRecord, prev *LoadedPlugin) (*pluginResource, error) {
+	if err := checkRequiredCapabilities(row.Manifest.RequiredCapabilities); err != nil {
+		return nil, err
+	}
 	if !validSHA(row.PackageSHA256) {
 		return nil, errors.New("package sha256 is not lowercase hex")
 	}
@@ -1096,8 +1128,12 @@ func (m *Manager) runInTx(ctx context.Context, fn func(context.Context) error) e
 	if tx := ent.TxFromContext(ctx); tx != nil {
 		return fn(ent.NewContext(ctx, tx.Client()))
 	}
+	client := m.client(ctx)
+	if client.IsTransactional() {
+		return fn(ctx)
+	}
 
-	tx, err := m.db.Tx(ctx)
+	tx, err := client.Tx(ctx)
 	if err != nil {
 		if errors.Is(err, ent.ErrTxStarted) {
 			return fn(ctx)
@@ -1341,6 +1377,8 @@ type LoadedPlugin struct {
 	GrantedNetwork     []string
 	Config             map[string]any
 	PackageSHA256      string
+	updatedAt          time.Time
+	automationScope    objects.PluginAutomationScope
 	Status             RuntimeStatus
 	Reason             string
 
@@ -1567,21 +1605,22 @@ type fingerprintRow struct {
 }
 
 type pluginRecord struct {
-	ID             int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      int
-	PluginID       string
-	Name           string
-	Version        string
-	Description    string
-	Manifest       objects.PluginManifest
-	PackageSHA256  string
-	Enabled        bool
-	Priority       int
-	Granted        []string
-	GrantedNetwork []string
-	Config         map[string]any
+	ID              int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       int
+	PluginID        string
+	Name            string
+	Version         string
+	Description     string
+	Manifest        objects.PluginManifest
+	PackageSHA256   string
+	Enabled         bool
+	Priority        int
+	Granted         []string
+	GrantedNetwork  []string
+	Config          map[string]any
+	AutomationScope objects.PluginAutomationScope
 }
 
 func (row pluginRecord) loaded() *LoadedPlugin {
@@ -1608,6 +1647,8 @@ func (row pluginRecord) loaded() *LoadedPlugin {
 		GrantedNetwork:     network,
 		Config:             config,
 		PackageSHA256:      row.PackageSHA256,
+		updatedAt:          row.UpdatedAt,
+		automationScope:    row.AutomationScope,
 	}
 }
 
@@ -1629,19 +1670,22 @@ func (row pluginRecord) entity() *ent.Plugin {
 		GrantedPermissions: item.GrantedPermissions,
 		GrantedNetwork:     item.GrantedNetwork,
 		Config:             item.Config,
+		AutomationScope:    row.AutomationScope,
 	}
 }
 
 func previewFrom(row pluginRecord, pkg *Package, diff ManifestDiff) *UpgradePreview {
 	return &UpgradePreview{
-		CurrentVersion: row.Version,
-		NewVersion:     pkg.Manifest.Version,
-		Permissions:    slices.Clone(diff.Permissions),
-		Network:        slices.Clone(diff.Network),
-		Events:         slices.Clone(diff.Events),
-		Hooks:          slices.Clone(diff.Hooks),
-		Pages:          slices.Clone(diff.Pages),
-		Actions:        slices.Clone(diff.Actions),
+		CurrentVersion:       row.Version,
+		NewVersion:           pkg.Manifest.Version,
+		Permissions:          slices.Clone(diff.Permissions),
+		Network:              slices.Clone(diff.Network),
+		Events:               slices.Clone(diff.Events),
+		Hooks:                slices.Clone(diff.Hooks),
+		Pages:                slices.Clone(diff.Pages),
+		Actions:              slices.Clone(diff.Actions),
+		Schedules:            slices.Clone(diff.Schedules),
+		RequiredCapabilities: slices.Clone(diff.RequiredCapabilities),
 	}
 }
 

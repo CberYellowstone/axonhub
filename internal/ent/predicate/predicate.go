@@ -12,6 +12,9 @@ type APIKey func(*sql.Selector)
 // APIKeyProfileTemplate is the predicate function for apikeyprofiletemplate builders.
 type APIKeyProfileTemplate func(*sql.Selector)
 
+// APIKeySuspension is the predicate function for apikeysuspension builders.
+type APIKeySuspension func(*sql.Selector)
+
 // Channel is the predicate function for channel builders.
 type Channel func(*sql.Selector)
 
@@ -41,6 +44,12 @@ type OIDCIdentity func(*sql.Selector)
 
 // Plugin is the predicate function for plugin builders.
 type Plugin func(*sql.Selector)
+
+// PluginNotification is the predicate function for pluginnotification builders.
+type PluginNotification func(*sql.Selector)
+
+// PluginSchedule is the predicate function for pluginschedule builders.
+type PluginSchedule func(*sql.Selector)
 
 // PluginStorage is the predicate function for pluginstorage builders.
 type PluginStorage func(*sql.Selector)

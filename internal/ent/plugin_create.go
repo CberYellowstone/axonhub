@@ -193,6 +193,20 @@ func (_c *PluginCreate) SetConfig(v map[string]interface{}) *PluginCreate {
 	return _c
 }
 
+// SetAutomationScope sets the "automation_scope" field.
+func (_c *PluginCreate) SetAutomationScope(v objects.PluginAutomationScope) *PluginCreate {
+	_c.mutation.SetAutomationScope(v)
+	return _c
+}
+
+// SetNillableAutomationScope sets the "automation_scope" field if the given value is not nil.
+func (_c *PluginCreate) SetNillableAutomationScope(v *objects.PluginAutomationScope) *PluginCreate {
+	if v != nil {
+		_c.SetAutomationScope(*v)
+	}
+	return _c
+}
+
 // Mutation returns the PluginMutation object of the builder.
 func (_c *PluginCreate) Mutation() *PluginMutation {
 	return _c.mutation
@@ -288,6 +302,10 @@ func (_c *PluginCreate) defaults() error {
 		v := plugin.DefaultConfig
 		_c.mutation.SetConfig(v)
 	}
+	if _, ok := _c.mutation.AutomationScope(); !ok {
+		v := plugin.DefaultAutomationScope
+		_c.mutation.SetAutomationScope(v)
+	}
 	return nil
 }
 
@@ -334,6 +352,11 @@ func (_c *PluginCreate) check() error {
 	}
 	if _, ok := _c.mutation.Priority(); !ok {
 		return &ValidationError{Name: "priority", err: errors.New(`ent: missing required field "Plugin.priority"`)}
+	}
+	if v, ok := _c.mutation.AutomationScope(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "automation_scope", err: fmt.Errorf(`ent: validator failed for field "Plugin.automation_scope": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -421,6 +444,10 @@ func (_c *PluginCreate) createSpec() (*Plugin, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Config(); ok {
 		_spec.SetField(plugin.FieldConfig, field.TypeJSON, value)
 		_node.Config = value
+	}
+	if value, ok := _c.mutation.AutomationScope(); ok {
+		_spec.SetField(plugin.FieldAutomationScope, field.TypeJSON, value)
+		_node.AutomationScope = value
 	}
 	return _node, _spec
 }
@@ -693,6 +720,24 @@ func (u *PluginUpsert) UpdateConfig() *PluginUpsert {
 // ClearConfig clears the value of the "config" field.
 func (u *PluginUpsert) ClearConfig() *PluginUpsert {
 	u.SetNull(plugin.FieldConfig)
+	return u
+}
+
+// SetAutomationScope sets the "automation_scope" field.
+func (u *PluginUpsert) SetAutomationScope(v objects.PluginAutomationScope) *PluginUpsert {
+	u.Set(plugin.FieldAutomationScope, v)
+	return u
+}
+
+// UpdateAutomationScope sets the "automation_scope" field to the value that was provided on create.
+func (u *PluginUpsert) UpdateAutomationScope() *PluginUpsert {
+	u.SetExcluded(plugin.FieldAutomationScope)
+	return u
+}
+
+// ClearAutomationScope clears the value of the "automation_scope" field.
+func (u *PluginUpsert) ClearAutomationScope() *PluginUpsert {
+	u.SetNull(plugin.FieldAutomationScope)
 	return u
 }
 
@@ -1000,6 +1045,27 @@ func (u *PluginUpsertOne) UpdateConfig() *PluginUpsertOne {
 func (u *PluginUpsertOne) ClearConfig() *PluginUpsertOne {
 	return u.Update(func(s *PluginUpsert) {
 		s.ClearConfig()
+	})
+}
+
+// SetAutomationScope sets the "automation_scope" field.
+func (u *PluginUpsertOne) SetAutomationScope(v objects.PluginAutomationScope) *PluginUpsertOne {
+	return u.Update(func(s *PluginUpsert) {
+		s.SetAutomationScope(v)
+	})
+}
+
+// UpdateAutomationScope sets the "automation_scope" field to the value that was provided on create.
+func (u *PluginUpsertOne) UpdateAutomationScope() *PluginUpsertOne {
+	return u.Update(func(s *PluginUpsert) {
+		s.UpdateAutomationScope()
+	})
+}
+
+// ClearAutomationScope clears the value of the "automation_scope" field.
+func (u *PluginUpsertOne) ClearAutomationScope() *PluginUpsertOne {
+	return u.Update(func(s *PluginUpsert) {
+		s.ClearAutomationScope()
 	})
 }
 
@@ -1473,6 +1539,27 @@ func (u *PluginUpsertBulk) UpdateConfig() *PluginUpsertBulk {
 func (u *PluginUpsertBulk) ClearConfig() *PluginUpsertBulk {
 	return u.Update(func(s *PluginUpsert) {
 		s.ClearConfig()
+	})
+}
+
+// SetAutomationScope sets the "automation_scope" field.
+func (u *PluginUpsertBulk) SetAutomationScope(v objects.PluginAutomationScope) *PluginUpsertBulk {
+	return u.Update(func(s *PluginUpsert) {
+		s.SetAutomationScope(v)
+	})
+}
+
+// UpdateAutomationScope sets the "automation_scope" field to the value that was provided on create.
+func (u *PluginUpsertBulk) UpdateAutomationScope() *PluginUpsertBulk {
+	return u.Update(func(s *PluginUpsert) {
+		s.UpdateAutomationScope()
+	})
+}
+
+// ClearAutomationScope clears the value of the "automation_scope" field.
+func (u *PluginUpsertBulk) ClearAutomationScope() *PluginUpsertBulk {
+	return u.Update(func(s *PluginUpsert) {
+		s.ClearAutomationScope()
 	})
 }
 

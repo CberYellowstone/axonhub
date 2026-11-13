@@ -15,23 +15,26 @@ import (
 // InstalledPlugin is the admin GraphQL view of one plugin row.
 // It never carries package bytes.
 type InstalledPlugin struct {
-	ID                  objects.GUID
-	PluginID            string
-	Name                string
-	Version             string
-	Description         string
-	Enabled             bool
-	Priority            int
-	Builtin             bool
-	GrantedPermissions  []string
-	GrantedNetwork      []string
-	ManifestPermissions []string
-	ManifestHooks       ManifestHooks
-	ManifestNetwork     []string
-	ConfigFields        []ConfigField
-	Config              map[string]any
-	RuntimeStatus       string
-	RuntimeError        string
+	ID                   objects.GUID
+	PluginID             string
+	Name                 string
+	Version              string
+	Description          string
+	Enabled              bool
+	Priority             int
+	Builtin              bool
+	GrantedPermissions   []string
+	GrantedNetwork       []string
+	ManifestPermissions  []string
+	ManifestHooks        ManifestHooks
+	ManifestNetwork      []string
+	ConfigFields         []ConfigField
+	Config               map[string]any
+	RuntimeStatus        string
+	RuntimeError         string
+	AutomationScope      objects.PluginAutomationScope
+	ManifestSchedules    []objects.PluginScheduleSpec
+	RequiredCapabilities []string
 }
 
 // ManifestHooks is the typed public view of the manifest's request hooks.
@@ -189,23 +192,26 @@ func (m *Manager) presentRecord(row pluginRecord, statuses map[int]RuntimeStatus
 		status = string(RuntimeStatusDisabled)
 	}
 	return InstalledPlugin{
-		ID:                  pluginGUID(row.ID),
-		PluginID:            row.PluginID,
-		Name:                row.Name,
-		Version:             row.Version,
-		Description:         row.Description,
-		Enabled:             row.Enabled,
-		Priority:            row.Priority,
-		Builtin:             m.IsBuiltin(row.PluginID),
-		GrantedPermissions:  cloneStrings(row.Granted),
-		GrantedNetwork:      cloneStrings(row.GrantedNetwork),
-		ManifestPermissions: cloneStrings(row.Manifest.Permissions),
-		ManifestNetwork:     cloneStrings(row.Manifest.NetworkGrants()),
-		ManifestHooks:       presentHooks(row.Manifest.Hooks),
-		ConfigFields:        configFields(row.Manifest.ConfigSchema),
-		Config:              maskConfig(row.Manifest.ConfigSchema, row.Config),
-		RuntimeStatus:       status,
-		RuntimeError:        reason,
+		ID:                   pluginGUID(row.ID),
+		PluginID:             row.PluginID,
+		Name:                 row.Name,
+		Version:              row.Version,
+		Description:          row.Description,
+		Enabled:              row.Enabled,
+		Priority:             row.Priority,
+		Builtin:              m.IsBuiltin(row.PluginID),
+		GrantedPermissions:   cloneStrings(row.Granted),
+		GrantedNetwork:       cloneStrings(row.GrantedNetwork),
+		ManifestPermissions:  cloneStrings(row.Manifest.Permissions),
+		ManifestNetwork:      cloneStrings(row.Manifest.NetworkGrants()),
+		ManifestHooks:        presentHooks(row.Manifest.Hooks),
+		ConfigFields:         configFields(row.Manifest.ConfigSchema),
+		Config:               maskConfig(row.Manifest.ConfigSchema, row.Config),
+		RuntimeStatus:        status,
+		RuntimeError:         reason,
+		AutomationScope:      row.AutomationScope,
+		ManifestSchedules:    row.Manifest.Schedules,
+		RequiredCapabilities: cloneStrings(row.Manifest.RequiredCapabilities),
 	}
 }
 
@@ -223,21 +229,22 @@ func recordFromEntity(row *ent.Plugin) pluginRecord {
 		return pluginRecord{}
 	}
 	return pluginRecord{
-		ID:             row.ID,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
-		DeletedAt:      row.DeletedAt,
-		PackageSHA256:  row.PackageSha256,
-		PluginID:       row.PluginID,
-		Name:           row.Name,
-		Version:        row.Version,
-		Description:    row.Description,
-		Manifest:       row.Manifest,
-		Enabled:        row.Enabled,
-		Priority:       row.Priority,
-		Granted:        cloneStrings(row.GrantedPermissions),
-		GrantedNetwork: cloneStrings(row.GrantedNetwork),
-		Config:         cloneConfig(row.Config),
+		ID:              row.ID,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		DeletedAt:       row.DeletedAt,
+		PackageSHA256:   row.PackageSha256,
+		PluginID:        row.PluginID,
+		Name:            row.Name,
+		Version:         row.Version,
+		Description:     row.Description,
+		Manifest:        row.Manifest,
+		Enabled:         row.Enabled,
+		Priority:        row.Priority,
+		Granted:         cloneStrings(row.GrantedPermissions),
+		GrantedNetwork:  cloneStrings(row.GrantedNetwork),
+		Config:          cloneConfig(row.Config),
+		AutomationScope: row.AutomationScope,
 	}
 }
 
@@ -246,14 +253,16 @@ func normalizePreview(preview *UpgradePreview) *UpgradePreview {
 		return nil
 	}
 	return &UpgradePreview{
-		CurrentVersion: preview.CurrentVersion,
-		NewVersion:     preview.NewVersion,
-		Permissions:    cloneStrings(preview.Permissions),
-		Network:        cloneStrings(preview.Network),
-		Events:         cloneStrings(preview.Events),
-		Hooks:          cloneStrings(preview.Hooks),
-		Pages:          cloneStrings(preview.Pages),
-		Actions:        cloneStrings(preview.Actions),
+		CurrentVersion:       preview.CurrentVersion,
+		NewVersion:           preview.NewVersion,
+		Permissions:          cloneStrings(preview.Permissions),
+		Network:              cloneStrings(preview.Network),
+		Events:               cloneStrings(preview.Events),
+		Hooks:                cloneStrings(preview.Hooks),
+		Pages:                cloneStrings(preview.Pages),
+		Actions:              cloneStrings(preview.Actions),
+		Schedules:            cloneStrings(preview.Schedules),
+		RequiredCapabilities: cloneStrings(preview.RequiredCapabilities),
 	}
 }
 

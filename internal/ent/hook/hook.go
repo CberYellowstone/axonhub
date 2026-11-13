@@ -33,6 +33,18 @@ func (f APIKeyProfileTemplateFunc) Mutate(ctx context.Context, m ent.Mutation) (
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.APIKeyProfileTemplateMutation", m)
 }
 
+// The APIKeySuspensionFunc type is an adapter to allow the use of ordinary
+// function as APIKeySuspension mutator.
+type APIKeySuspensionFunc func(context.Context, *ent.APIKeySuspensionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f APIKeySuspensionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.APIKeySuspensionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.APIKeySuspensionMutation", m)
+}
+
 // The ChannelFunc type is an adapter to allow the use of ordinary
 // function as Channel mutator.
 type ChannelFunc func(context.Context, *ent.ChannelMutation) (ent.Value, error)
@@ -151,6 +163,30 @@ func (f PluginFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, erro
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PluginMutation", m)
+}
+
+// The PluginNotificationFunc type is an adapter to allow the use of ordinary
+// function as PluginNotification mutator.
+type PluginNotificationFunc func(context.Context, *ent.PluginNotificationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PluginNotificationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PluginNotificationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PluginNotificationMutation", m)
+}
+
+// The PluginScheduleFunc type is an adapter to allow the use of ordinary
+// function as PluginSchedule mutator.
+type PluginScheduleFunc func(context.Context, *ent.PluginScheduleMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PluginScheduleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PluginScheduleMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PluginScheduleMutation", m)
 }
 
 // The PluginStorageFunc type is an adapter to allow the use of ordinary

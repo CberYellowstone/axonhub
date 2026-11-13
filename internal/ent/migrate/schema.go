@@ -93,6 +93,42 @@ var (
 			},
 		},
 	}
+	// APIKeySuspensionsColumns holds the columns for the "api_key_suspensions" table.
+	APIKeySuspensionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "updated_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "installation_id", Type: field.TypeInt},
+		{Name: "api_key_id", Type: field.TypeInt},
+		{Name: "project_id", Type: field.TypeInt},
+		{Name: "plugin_id", Type: field.TypeString, Size: 64},
+		{Name: "idempotency_key_hash", Type: field.TypeString, Size: 64},
+		{Name: "reason", Type: field.TypeString, Size: 512},
+		{Name: "evidence", Type: field.TypeJSON},
+		{Name: "created_by", Type: field.TypeString, Size: 128},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "released_at", Type: field.TypeTime, Nullable: true},
+		{Name: "released_by", Type: field.TypeString, Nullable: true, Size: 128, Default: ""},
+		{Name: "release_reason", Type: field.TypeString, Nullable: true, Size: 512, Default: ""},
+	}
+	// APIKeySuspensionsTable holds the schema information for the "api_key_suspensions" table.
+	APIKeySuspensionsTable = &schema.Table{
+		Name:       "api_key_suspensions",
+		Columns:    APIKeySuspensionsColumns,
+		PrimaryKey: []*schema.Column{APIKeySuspensionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "api_key_suspensions_by_idempotency",
+				Unique:  true,
+				Columns: []*schema.Column{APIKeySuspensionsColumns[3], APIKeySuspensionsColumns[7]},
+			},
+			{
+				Name:    "api_key_suspensions_by_key_project_release",
+				Unique:  false,
+				Columns: []*schema.Column{APIKeySuspensionsColumns[4], APIKeySuspensionsColumns[5], APIKeySuspensionsColumns[12]},
+			},
+		},
+	}
 	// ChannelsColumns holds the columns for the "channels" table.
 	ChannelsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -416,6 +452,7 @@ var (
 		{Name: "granted_permissions", Type: field.TypeJSON, Nullable: true},
 		{Name: "granted_network", Type: field.TypeJSON, Nullable: true},
 		{Name: "config", Type: field.TypeJSON, Nullable: true},
+		{Name: "automation_scope", Type: field.TypeJSON, Nullable: true},
 	}
 	// PluginsTable holds the schema information for the "plugins" table.
 	PluginsTable = &schema.Table{
@@ -430,6 +467,79 @@ var (
 			},
 		},
 	}
+	// PluginNotificationsColumns holds the columns for the "plugin_notifications" table.
+	PluginNotificationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "updated_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "installation_id", Type: field.TypeInt},
+		{Name: "idempotency_hash", Type: field.TypeString, Size: 64},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 256},
+		{Name: "event_id", Type: field.TypeString, Size: 64},
+		{Name: "target_name", Type: field.TypeString, Size: 128},
+		{Name: "payload", Type: field.TypeJSON},
+		{Name: "suspension_id", Type: field.TypeInt, Nullable: true},
+		{Name: "evidence", Type: field.TypeJSON, Nullable: true},
+		{Name: "status", Type: field.TypeString, Size: 16, Default: "pending"},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "next_attempt_at", Type: field.TypeInt64, Default: 0},
+		{Name: "lease_token", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "lease_until", Type: field.TypeInt64, Default: 0},
+		{Name: "last_error", Type: field.TypeString, Size: 128, Default: ""},
+	}
+	// PluginNotificationsTable holds the schema information for the "plugin_notifications" table.
+	PluginNotificationsTable = &schema.Table{
+		Name:       "plugin_notifications",
+		Columns:    PluginNotificationsColumns,
+		PrimaryKey: []*schema.Column{PluginNotificationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "plugin_notifications_by_installation_idempotency",
+				Unique:  true,
+				Columns: []*schema.Column{PluginNotificationsColumns[3], PluginNotificationsColumns[4]},
+			},
+			{
+				Name:    "plugin_notifications_by_next_attempt",
+				Unique:  false,
+				Columns: []*schema.Column{PluginNotificationsColumns[13]},
+			},
+		},
+	}
+	// PluginSchedulesColumns holds the columns for the "plugin_schedules" table.
+	PluginSchedulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "updated_at", Type: field.TypeTime, Default: schema.Expr("CURRENT_TIMESTAMP")},
+		{Name: "installation_id", Type: field.TypeInt},
+		{Name: "key", Type: field.TypeString, Size: 32},
+		{Name: "interval_seconds", Type: field.TypeInt},
+		{Name: "revision", Type: field.TypeString, Size: 64},
+		{Name: "next_run_at", Type: field.TypeTime},
+		{Name: "run_id", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "scheduled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "attempt", Type: field.TypeInt, Default: 0},
+		{Name: "lease_owner", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "lease_token", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "lease_until", Type: field.TypeTime, Nullable: true},
+	}
+	// PluginSchedulesTable holds the schema information for the "plugin_schedules" table.
+	PluginSchedulesTable = &schema.Table{
+		Name:       "plugin_schedules",
+		Columns:    PluginSchedulesColumns,
+		PrimaryKey: []*schema.Column{PluginSchedulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "plugin_schedules_by_installation_key",
+				Unique:  true,
+				Columns: []*schema.Column{PluginSchedulesColumns[3], PluginSchedulesColumns[4]},
+			},
+			{
+				Name:    "plugin_schedules_by_next_run",
+				Unique:  false,
+				Columns: []*schema.Column{PluginSchedulesColumns[7]},
+			},
+		},
+	}
 	// PluginStoragesColumns holds the columns for the "plugin_storages" table.
 	PluginStoragesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -439,6 +549,7 @@ var (
 		{Name: "namespace", Type: field.TypeString, Size: 128, Default: "default"},
 		{Name: "key", Type: field.TypeString, Size: 128},
 		{Name: "value", Type: field.TypeString, SchemaType: map[string]string{"mysql": "mediumtext"}},
+		{Name: "revision", Type: field.TypeString, Size: 36, Default: ""},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 	}
 	// PluginStoragesTable holds the schema information for the "plugin_storages" table.
@@ -607,6 +718,7 @@ var (
 		{Name: "response_chunks", Type: field.TypeJSON, Nullable: true},
 		{Name: "external_id", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "processing", "completed", "failed", "canceled"}},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "stream", Type: field.TypeBool, Default: false},
 		{Name: "client_ip", Type: field.TypeString, Default: ""},
 		{Name: "user_agent", Type: field.TypeString, Default: ""},
@@ -631,31 +743,31 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "requests_api_keys_requests",
-				Columns:    []*schema.Column{RequestsColumns[25]},
+				Columns:    []*schema.Column{RequestsColumns[26]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "requests_channels_requests",
-				Columns:    []*schema.Column{RequestsColumns[26]},
+				Columns:    []*schema.Column{RequestsColumns[27]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "requests_data_storages_requests",
-				Columns:    []*schema.Column{RequestsColumns[27]},
+				Columns:    []*schema.Column{RequestsColumns[28]},
 				RefColumns: []*schema.Column{DataStoragesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "requests_projects_requests",
-				Columns:    []*schema.Column{RequestsColumns[28]},
+				Columns:    []*schema.Column{RequestsColumns[29]},
 				RefColumns: []*schema.Column{ProjectsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "requests_traces_requests",
-				Columns:    []*schema.Column{RequestsColumns[29]},
+				Columns:    []*schema.Column{RequestsColumns[30]},
 				RefColumns: []*schema.Column{TracesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -664,32 +776,37 @@ var (
 			{
 				Name:    "requests_by_api_key_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[25], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[26], RequestsColumns[1]},
 			},
 			{
 				Name:    "requests_by_project_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[28], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[29], RequestsColumns[1]},
 			},
 			{
 				Name:    "requests_by_project_id_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[28], RequestsColumns[3], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[29], RequestsColumns[3], RequestsColumns[1]},
 			},
 			{
 				Name:    "requests_by_channel_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[26], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[27], RequestsColumns[1]},
 			},
 			{
 				Name:    "requests_by_trace_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[29], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[30], RequestsColumns[1]},
 			},
 			{
 				Name:    "requests_by_external_id_api_key_id_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{RequestsColumns[13], RequestsColumns[25], RequestsColumns[14], RequestsColumns[1]},
+				Columns: []*schema.Column{RequestsColumns[13], RequestsColumns[26], RequestsColumns[14], RequestsColumns[1]},
+			},
+			{
+				Name:    "requests_by_project_key_completed",
+				Unique:  false,
+				Columns: []*schema.Column{RequestsColumns[29], RequestsColumns[26], RequestsColumns[14], RequestsColumns[15], RequestsColumns[0]},
 			},
 			{
 				Name:    "requests_by_created_at",
@@ -934,6 +1051,7 @@ var (
 		{Name: "total_tokens", Type: field.TypeInt64, Default: 0},
 		{Name: "prompt_audio_tokens", Type: field.TypeInt64, Nullable: true, Default: 0},
 		{Name: "prompt_cached_tokens", Type: field.TypeInt64, Nullable: true, Default: 0},
+		{Name: "cache_read_status", Type: field.TypeString, Size: 16, Default: "unknown"},
 		{Name: "prompt_write_cached_tokens", Type: field.TypeInt64, Nullable: true, Default: 0},
 		{Name: "prompt_write_cached_tokens_5m", Type: field.TypeInt64, Nullable: true, Default: 0},
 		{Name: "prompt_write_cached_tokens_1h", Type: field.TypeInt64, Nullable: true, Default: 0},
@@ -958,19 +1076,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_channels_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[22]},
+				Columns:    []*schema.Column{UsageLogsColumns[23]},
 				RefColumns: []*schema.Column{ChannelsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_projects_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[23]},
+				Columns:    []*schema.Column{UsageLogsColumns[24]},
 				RefColumns: []*schema.Column{ProjectsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_requests_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[24]},
+				Columns:    []*schema.Column{UsageLogsColumns[25]},
 				RefColumns: []*schema.Column{RequestsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -979,7 +1097,7 @@ var (
 			{
 				Name:    "usage_logs_by_request_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[24]},
+				Columns: []*schema.Column{UsageLogsColumns[25]},
 			},
 			{
 				Name:    "usage_logs_by_created_at",
@@ -994,17 +1112,22 @@ var (
 			{
 				Name:    "usage_logs_by_project_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[23], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[24], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usage_logs_by_channel_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[22], UsageLogsColumns[1]},
+				Columns: []*schema.Column{UsageLogsColumns[23], UsageLogsColumns[1]},
 			},
 			{
 				Name:    "usage_logs_by_api_key_id_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{UsageLogsColumns[3], UsageLogsColumns[1]},
+			},
+			{
+				Name:    "usage_logs_by_project_request_recent",
+				Unique:  false,
+				Columns: []*schema.Column{UsageLogsColumns[24], UsageLogsColumns[25], UsageLogsColumns[1], UsageLogsColumns[0]},
 			},
 		},
 	}
@@ -1123,6 +1246,7 @@ var (
 	Tables = []*schema.Table{
 		APIKeysTable,
 		APIKeyProfileTemplatesTable,
+		APIKeySuspensionsTable,
 		ChannelsTable,
 		ChannelModelPricesTable,
 		ChannelModelPriceVersionsTable,
@@ -1133,6 +1257,8 @@ var (
 		ModelsTable,
 		OidcIdentitiesTable,
 		PluginsTable,
+		PluginNotificationsTable,
+		PluginSchedulesTable,
 		PluginStoragesTable,
 		ProjectsTable,
 		PromptsTable,

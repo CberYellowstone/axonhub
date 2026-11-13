@@ -48,8 +48,10 @@ type Plugin struct {
 	// Owner-granted subset of manifest.network.
 	GrantedNetwork []string `json:"granted_network,omitempty"`
 	// Plugin configuration object validated against manifest.configSchema.
-	Config       map[string]interface{} `json:"config,omitempty"`
-	selectValues sql.SelectValues
+	Config map[string]interface{} `json:"config,omitempty"`
+	// Owner-approved project and API key ceiling for background automation. Empty denies all.
+	AutomationScope objects.PluginAutomationScope `json:"automation_scope,omitempty"`
+	selectValues    sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -57,7 +59,7 @@ func (*Plugin) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case plugin.FieldManifest, plugin.FieldPackage, plugin.FieldGrantedPermissions, plugin.FieldGrantedNetwork, plugin.FieldConfig:
+		case plugin.FieldManifest, plugin.FieldPackage, plugin.FieldGrantedPermissions, plugin.FieldGrantedNetwork, plugin.FieldConfig, plugin.FieldAutomationScope:
 			values[i] = new([]byte)
 		case plugin.FieldEnabled:
 			values[i] = new(sql.NullBool)
@@ -186,6 +188,14 @@ func (_m *Plugin) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field config: %w", err)
 				}
 			}
+		case plugin.FieldAutomationScope:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field automation_scope", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.AutomationScope); err != nil {
+					return fmt.Errorf("unmarshal field automation_scope: %w", err)
+				}
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -266,6 +276,9 @@ func (_m *Plugin) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("config=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Config))
+	builder.WriteString(", ")
+	builder.WriteString("automation_scope=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AutomationScope))
 	builder.WriteByte(')')
 	return builder.String()
 }

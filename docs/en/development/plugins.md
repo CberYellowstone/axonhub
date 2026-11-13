@@ -11,6 +11,7 @@ An AxonHub plugin is a `.axplugin` zip. An owner uploads it under **Plugins** (`
 - **Pages.** Each `ui.pages` entry is a sidebar item and a full-page iframe.
 - **Plugin KV.** `ctx.kv` and the page GraphQL KV fields read and write the same rows. Keys belong to this installation.
 - **Host-proxied fetch.** `ctx.fetch` in `plugin.js` and `axonhub.fetch` in a page send HTTP through the host. The URL must match a granted `network` rule.
+- **Background automation.** Declare `schedules` and export `onSchedule(ctx, job)` to read cache metrics, suspend keys, and queue notifications within an independently Owner-approved scope; see [background automation](#background-automation-and-cache-metrics).
 
 `onRequest` may change `model`. The model permission check and model mapping that follow use the new model. Both request hooks leave `stream` equal to the input. `onAttempt` also leaves `model` equal to the input for that attempt.
 
@@ -105,7 +106,7 @@ A `.axplugin` file is a zip:
 
 ```text
 manifest.json
-plugin.js          optional; required when events or hooks are declared
+plugin.js          optional; required when events, hooks, or schedules are declared
 ui/**              html, js, css, svg, png, woff2
 ```
 
@@ -152,13 +153,15 @@ Fields use camelCase. A field that is not open is rejected at install and is not
 | `permissions` | no | Names from the list below. Omitted means `[]` |
 | `network` | no | At most 32 rules. Omitted means `[]` |
 | `events` | no | Names from the eight events above. A non-empty list requires `export function onEvent` |
+| `schedules` | no | At most 8 `{ key, intervalSeconds }` entries; unique keys follow the page-key format, intervals are 60–86400 seconds; a non-empty list requires `onSchedule` |
+| `requiredCapabilities` | no | Required host capability names; unsupported requirements fail installation. The management query `pluginHostCapabilities` lists implemented capabilities |
 | `hooks.request` | no | Object: enabled is required; true requires non-empty requestTypes and an onRequest export; false keeps configuration without running it |
 | `hooks.attempt` | no | Object: enabled is required; true requires non-empty apiFormats and an onAttempt export; false keeps configuration without running it |
 | `configSchema` | no | JSON Schema object, described below |
 | `ui.pages` | no | Sidebar pages, described below |
 | `ui.actions` | no | Global toolbar actions that open plugin dialogs |
 
-Open permissions: `read_channels`, `read_requests`, `read_dashboard`, `read_api_keys`, `read_projects`, `read_settings`, `write_channels`, `webhook`. Outbound URLs go in `network`. `read_plugins` and `write_plugins` are user scopes, not plugin permissions. KV is not a permission.
+Open permissions: `read_channels`, `read_requests`, `read_dashboard`, `read_api_keys`, `read_projects`, `read_settings`, `write_channels`, `webhook`, `read_usage_metrics`, `manage_key_suspensions`. Outbound URLs go in `network`. `read_plugins` and `write_plugins` are user scopes, not plugin permissions. KV is not a permission. `manage_key_suspensions` is high risk: it permits temporary or permanent blocking of approved keys. `read_usage_metrics` permits non-sensitive aggregate metrics. An Owner separately approves the project and key scope for these permissions.
 
 A `network` entry is either an exact `https` URL or `{ "regex": "^https://api\\.example\\.com/v1/items/[0-9]+$" }`. An exact URL includes a path and no userinfo, query, or fragment, and it matches that path only. A regex is a full match, at most 256 characters, against the URL with query and fragment removed. The request may still carry a query. Redirects are not followed: statuses 301, 302, 303, 307, and 308 reject both `ctx.fetch` and `axonhub.fetch` Promises with `INVALID_STATE`.
 
@@ -170,7 +173,7 @@ A `network` entry is either an exact `https` URL or `{ "regex": "^https://api\\.
 
 The host calls named exports only. `export default` is not scanned, and there is no register function. An enabled hook must be a function export. An exported function that the manifest does not declare is not called.
 
-All entry points put ctx first: `onEvent(ctx, event)`, `onRequest(ctx, request)`, and `onAttempt(ctx, body)`.
+All entry points put ctx first: `onEvent(ctx, event)`, `onRequest(ctx, request)`, `onAttempt(ctx, body)`, and `onSchedule(ctx, job)`.
 
 onRequest matches RequestType and receives the unified request's public fields as a JS object with snake_case keys. The host preserves internal bookkeeping and non-public audio/image data outside replace/patch. onAttempt matches the actual outbound APIFormat of this attempt and receives the target protocol's JSON body object, not llm.Request, a string, or bytes. Multipart, binary, and non-object JSON bodies skip attempt hooks.
 
@@ -282,6 +285,8 @@ These `ctx.kv` methods return synchronously and throw a `PluginHostError` with a
 | Call | Return value |
 | --- | --- |
 | `ctx.kv.get(key, { namespace }?)` | String value, or `null` when missing or expired |
+| `ctx.kv.getEntry(key, { namespace }?)` | `KVEntry` including `revision`; `null` if missing or expired |
+| `ctx.kv.compareAndSet(key, expectedRevision, value, { namespace, ttlSeconds }?)` | `{ swapped, entry }`; writes a string when the revision matches, otherwise returns `{ swapped: false, entry: null }` |
 | `ctx.kv.set(key, value, { namespace, ttlSeconds }?)` | `undefined`; value must be a string, so use `JSON.stringify` for JSON objects |
 | `ctx.kv.delete(key, { namespace }?)` | boolean indicating whether a row was deleted |
 | `ctx.kv.list({ namespace, prefix, first, after }?)` | The `KVPage` object below |
@@ -293,6 +298,7 @@ type KVEntry = {
   namespace: string;
   key: string;
   value: string;
+  revision: string;
   updatedAt: string;
   expiresAt: string | null;
 };
@@ -318,6 +324,55 @@ export function onEvent(ctx, event) {
 ```
 
 Pages call `pluginKVList(namespace, prefix, first, after)` through `axonhub.graphql`. Its result also has `entries` and `nextCursor`, but fields must be explicitly selected in GraphQL. GraphQL accepts `after: null` for the first page. `pluginKV` returns a complete entry or `null`, `setPluginKV` returns an entry, and `deletePluginKV` returns a boolean; unlike `ctx.kv.get`, `pluginKV` does not return just the value string.
+
+## Background automation and cache metrics
+
+Background automation has separate permission, scope, and host capability contracts. The [automation API reference](../../solutions/plugin-system/automation.md) documents all fields and limits, the Owner scope mutation, notification transaction boundaries, and administrator recovery examples. Supported capability names are `scheduler.durable.v1`, `usage.metrics.v1`, `key.suspensions.v1`, `kv.cas.v1`, and `notifications.webhook.v1`; put the ones your plugin uses in `requiredCapabilities`.
+
+Manifest fragment:
+
+```json
+{
+  "permissions": ["read_usage_metrics"],
+  "schedules": [{ "key": "check-cache", "intervalSeconds": 300 }],
+  "requiredCapabilities": ["scheduler.durable.v1", "usage.metrics.v1"]
+}
+```
+
+```js
+export function onSchedule(ctx, job) {
+  if (job.key !== "check-cache") return;
+  const page = ctx.usage.cacheStats({
+    projectId: 7, keyIds: [101], windowSeconds: 3600,
+    lastRequests: 50, minSamples: 50, lowThreshold: 0.2,
+  });
+  for (const item of page.items) {
+    if (!item.sampleComplete || item.cacheRate === null) continue;
+    ctx.log.info("cache metrics", {
+      keyId: item.keyId, cacheRate: item.cacheRate,
+      latestRequestId: item.latestRequestId,
+    });
+  }
+}
+```
+
+`job` contains `{ key, runId, scheduledAt, attempt }`. Durable scheduling is at least once, retries reuse `runId`, missed periods coalesce, and each invocation has a 10-second total budget including VM acquisition. `ctx.usage.cacheStats(options)` returns synchronously. Automation options must be a JSON object of at most 64 KiB; unknown fields and invalid types are rejected. Each query takes one positive integer project ID and either `keyIds` or `allKeys: true`; `excludeKeyIds` requires `allKeys`. Pages contain at most 100 keys; each ID filter list contains at most 1000 IDs. Reuse the returned `end` across pages and pass `nextAfterKeyId` as `afterKeyId`.
+
+`windowSeconds` is at most 7776000 (90 days), and `lastRequests` is at most 1000; provide at least one. Together they select each key's latest N requests within the time window. `minSamples` defaults to N, or 1 for a time-only window. Query separately and combine results in the plugin for AND/OR rules over distinct time and request-count conditions. Queries default to completed requests from the API source, ordered by the database-clock `completed_at` fixed on first completion, then request ID. Legacy requests without a completion timestamp use fixed `created_at` for positioning and are forced to unknown. The public sample field `createdAt` represents this fixed observation time. Metadata and attachment-download updates preserve window membership.
+
+`cacheRate` is total cached tokens divided by total input tokens, including cached tokens, across valid samples. Missing usage or unreported cache counts are unknown. Reported samples with zero input, negative cache counts, or cached tokens above input are invalid. Unknown and invalid requests stay within the latest N and break consecutive-low runs. `enoughSamples` checks valid sample count; `sampleComplete` additionally requires all selected records to be valid and the full N in latest-N mode. Action rules also check minimum input tokens and `validCount / count` coverage, with a log-only mode for validation. Details are capped at 1000 samples; check `samplesTruncated` and `trailingTruncated`. Statistics outside the JavaScript safe integer range fail; narrow the query and stop enforcement on errors.
+
+An Owner uses `/admin/graphql` and `setPluginAutomationScope(id: ID!, scope: PluginAutomationScopeInput!)` to replace the entire scope. An empty project list denies access. Plugin `id` is the GUID returned by `plugins`; project and key IDs inside the scope are positive integers. `allKeys` includes future keys, with exclusions taking precedence. Management details show the scope, and GraphQL provides scope editing. A direct Owner controls configuration and page KV writes for installations granted `manage_key_suspensions`. Page metrics intersect the current user's dashboard read authority with the installation scope. The current `read_dashboard` check is system-only; the same-named permission on a project membership does not satisfy it.
+
+| API | Contract |
+| --- | --- |
+| `ctx.keySuspensions.apply(input)` | Available in `onEvent`/`onSchedule`; requires `manage_key_suspensions`. Takes positive integer `apiKeyId` and `projectId`, plus `idempotencyKey`, `reason`, and `evidence`; choose a temporary duration of 1–31536000 seconds or explicit `permanent: true` with zero duration |
+| `ctx.keySuspensions.release(id)` / `list(filter)` | Release or list this installation's holds within its current scope; list is ordered by descending ID, uses `beforeId`, and returns at most 100 records |
+| `ctx.notifications.enqueue(input)` | Available in `onEvent`/`onSchedule`; requires `webhook`. Takes `{ targetName, payload, idempotencyKey, suspensionId?, evidence? }` and returns `{ id, eventId, status }` |
+
+`apply` may include `notification: { targetName, payload }`; the hold and notification enqueue commit in one transaction, with host-bound notification identity and evidence. Independent host calls commit separately; reconcile across KV, suspension, and notification operations after a crash. Notifications use an existing target. HTTP delivery is at least once, and receivers deduplicate by `eventId`. Personal and `noauth` keys cannot be suspended. Holds overlay manual key status; permanent holds continue blocking after disable or uninstall, while temporary holds expire naturally. Administrators inspect and release leftover holds through `apiKeySuspensions` and `releaseAPIKeySuspension`.
+
+Read durable state with `ctx.kv.getEntry`, then write with `compareAndSet`. `expectedRevision: null` creates only; updates pass back the original revision, and conflicts trigger bounded rereads. Action idempotency keys include the rule version, key ID, and `latestRequestId`. After expiry or administrator release, use completion timestamps to require enough new post-recovery samples and reconcile suspension history. A key based solely on `runId` would punish old evidence again in a later period. Replaying an existing idempotency key preserves its original expiry and release state.
 
 ## Global toolbar actions
 

@@ -1,3 +1,11 @@
+// 职责: 展示插件配置、声明的后台任务与已批准自动化范围。
+// 关联文件:
+//   frontend/src/features/plugins/data/plugins.ts
+//   frontend/src/features/plugins/components/plugin-config-form.tsx
+//   frontend/src/features/plugins/index.tsx
+//   frontend/src/locales/en/plugins.json
+//   frontend/src/locales/zh-CN/plugins.json
+// 注意事项: canManage 代表系统 Owner；已获 Key 阻断权限的插件仅允许 Owner 修改配置。
 'use client';
 
 import type { ReactNode } from 'react';
@@ -22,6 +30,7 @@ interface PluginDetailSheetProps {
 
 export function PluginDetailSheet({ plugin, canWrite, canManage, onEditPermissions, onOpenChange }: PluginDetailSheetProps) {
   const { t } = useTranslation();
+  const ownerOnlyConfig = !!plugin?.grantedPermissions.includes('manage_key_suspensions') && !canManage;
 
   return (
     <Sheet open={plugin !== null} onOpenChange={onOpenChange}>
@@ -84,8 +93,18 @@ export function PluginDetailSheet({ plugin, canWrite, canManage, onEditPermissio
                       items={plugin.grantedPermissions}
                       total={plugin.manifestPermissions.length}
                     />
-                    <ChipRow label={t('plugins.fields.grantedNetwork')} items={plugin.grantedNetwork} total={plugin.manifestNetwork.length} />
+                    <ChipRow
+                      label={t('plugins.fields.grantedNetwork')}
+                      items={plugin.grantedNetwork}
+                      total={plugin.manifestNetwork.length}
+                    />
                   </div>
+                  {plugin.grantedPermissions.includes('manage_key_suspensions') && (
+                    <Alert variant='destructive'>
+                      <IconAlertTriangle />
+                      <AlertDescription>{t('plugins.grant.keySuspensionWarning')}</AlertDescription>
+                    </Alert>
+                  )}
                 </Section>
 
                 <Section title={t('plugins.hooks.title')}>
@@ -103,14 +122,54 @@ export function PluginDetailSheet({ plugin, canWrite, canManage, onEditPermissio
                   </div>
                 </Section>
 
+                <Section title={t('plugins.automation.title')}>
+                  <div className='divide-y rounded-xl border'>
+                    <ChipRow
+                      label={t('plugins.automation.schedules')}
+                      items={plugin.manifestSchedules.map((schedule) =>
+                        t('plugins.automation.scheduleInterval', {
+                          key: schedule.key,
+                          intervalSeconds: schedule.intervalSeconds,
+                        })
+                      )}
+                      total={0}
+                    />
+                    <ChipRow label={t('plugins.automation.requiredCapabilities')} items={plugin.requiredCapabilities} total={0} />
+                    <div className='space-y-2 p-3 text-sm'>
+                      <p className='text-muted-foreground text-xs'>{t('plugins.automation.scope')}</p>
+                      <p className='text-muted-foreground'>{t('plugins.automation.scopeHint')}</p>
+                      {plugin.automationScope.projects.length === 0 ? (
+                        <p>{t('plugins.automation.scopeDenied')}</p>
+                      ) : (
+                        plugin.automationScope.projects.map((project) => (
+                          <div key={project.projectId} className='space-y-1'>
+                            <p className='font-medium'>{t('plugins.automation.project', { id: project.projectId })}</p>
+                            <p className='break-words'>
+                              {project.allKeys
+                                ? t('plugins.automation.allKeys')
+                                : project.apiKeyIds.length > 0
+                                  ? t('plugins.automation.selectedKeys', { ids: project.apiKeyIds.join(', ') })
+                                  : t('plugins.automation.noKeys')}
+                            </p>
+                            {project.excludedApiKeyIds.length > 0 && (
+                              <p className='text-muted-foreground break-words'>
+                                {t('plugins.automation.excludedKeys', { ids: project.excludedApiKeyIds.join(', ') })}
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </Section>
+
                 <Section title={t('plugins.config.title')}>
-                  {canWrite ? (
+                  {ownerOnlyConfig && <p className='text-muted-foreground text-sm'>{t('plugins.config.ownerOnly')}</p>}
+                  {canWrite && !ownerOnlyConfig ? (
                     <PluginConfigForm plugin={plugin} />
                   ) : (
                     <div className='divide-y rounded-xl border'>
-                      {plugin.configFields.length === 0 && (
-                        <p className='text-muted-foreground p-3 text-sm'>{t('plugins.config.empty')}</p>
-                      )}
+                      {plugin.configFields.length === 0 && <p className='text-muted-foreground p-3 text-sm'>{t('plugins.config.empty')}</p>}
                       {plugin.configFields.map((field) => (
                         <div key={field.name} className='flex items-start justify-between gap-4 p-3 text-sm'>
                           <span className='text-muted-foreground'>{field.title || field.name}</span>
@@ -172,7 +231,7 @@ function ChipRow({ label, items, total }: { label: string; items: string[]; tota
           {items.map((item) => (
             <Badge
               key={item}
-              variant={item.startsWith('write_') ? 'destructive' : 'secondary'}
+              variant={item.startsWith('write_') || item === 'manage_key_suspensions' ? 'destructive' : 'secondary'}
               className='max-w-full font-mono font-normal break-all whitespace-normal'
             >
               {item}

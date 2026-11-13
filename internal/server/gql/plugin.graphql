@@ -32,6 +32,9 @@ type Plugin {
   config: Map!
   runtimeStatus: String!
   runtimeError: String!
+  automationScope: PluginAutomationScope!
+  manifestSchedules: [PluginScheduleSpec!]!
+  requiredCapabilities: [String!]!
 }
 
 type PluginManifestHooks {
@@ -81,6 +84,8 @@ type PluginUpgradePreview {
   hooks: [String!]!
   pages: [String!]!
   actions: [String!]!
+  schedules: [String!]!
+  requiredCapabilities: [String!]!
 }
 
 type PluginInstallResult {
@@ -109,6 +114,8 @@ type PluginKVEntry {
   value: String!
   expiresAt: Time
   updatedAt: Time!
+	"""Opaque compare-and-set token. Changes on every write."""
+  revision: String!
 }
 
 extend type Query {
@@ -118,7 +125,13 @@ extend type Query {
 
 extend type Mutation {
   setPluginKV(namespace: String, key: String!, value: String!, ttlSeconds: Int): PluginKVEntry!
+  compareAndSetPluginKV(namespace: String, key: String!, expectedRevision: String, value: String!, ttlSeconds: Int): PluginKVCASResult!
   deletePluginKV(namespace: String, key: String!): Boolean!
+}
+
+type PluginKVCASResult {
+  swapped: Boolean!
+  entry: PluginKVEntry
 }
 
 type PluginUIPage {

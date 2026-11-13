@@ -573,6 +573,7 @@ func transformImageGenerationResponse(httpResp *httpclient.Response) (*llm.Respo
 	// Convert usage information if present
 	if imgResp.Usage != nil {
 		resp.Usage = &llm.Usage{
+			CacheReadStatus:  imgResp.Usage.CacheReadStatus,
 			PromptTokens:     imgResp.Usage.InputTokens,
 			CompletionTokens: imgResp.Usage.OutputTokens,
 			TotalTokens:      imgResp.Usage.TotalTokens,
@@ -583,6 +584,9 @@ func transformImageGenerationResponse(httpResp *httpclient.Response) (*llm.Respo
 				ImageTokens:  imgResp.Usage.InputTokensDetails.ImageTokens,
 				TextTokens:   imgResp.Usage.InputTokensDetails.TextTokens,
 				CachedTokens: lo.FromPtr(imgResp.Usage.InputTokensDetails.CachedTokens),
+			}
+			if imgResp.Usage.CacheReadStatus == "" && imgResp.Usage.InputTokensDetails.CachedTokens != nil {
+				resp.Usage.CacheReadStatus = llm.CacheReadReported
 			}
 		}
 

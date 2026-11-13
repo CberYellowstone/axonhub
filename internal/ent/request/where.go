@@ -115,6 +115,11 @@ func ExternalID(v string) predicate.Request {
 	return predicate.Request(sql.FieldEQ(FieldExternalID, v))
 }
 
+// CompletedAt applies equality check predicate on the "completed_at" field. It's identical to CompletedAtEQ.
+func CompletedAt(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldCompletedAt, v))
+}
+
 // Stream applies equality check predicate on the "stream" field. It's identical to StreamEQ.
 func Stream(v bool) predicate.Request {
 	return predicate.Request(sql.FieldEQ(FieldStream, v))
@@ -793,6 +798,56 @@ func StatusIn(vs ...Status) predicate.Request {
 // StatusNotIn applies the NotIn predicate on the "status" field.
 func StatusNotIn(vs ...Status) predicate.Request {
 	return predicate.Request(sql.FieldNotIn(FieldStatus, vs...))
+}
+
+// CompletedAtEQ applies the EQ predicate on the "completed_at" field.
+func CompletedAtEQ(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldEQ(FieldCompletedAt, v))
+}
+
+// CompletedAtNEQ applies the NEQ predicate on the "completed_at" field.
+func CompletedAtNEQ(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldNEQ(FieldCompletedAt, v))
+}
+
+// CompletedAtIn applies the In predicate on the "completed_at" field.
+func CompletedAtIn(vs ...time.Time) predicate.Request {
+	return predicate.Request(sql.FieldIn(FieldCompletedAt, vs...))
+}
+
+// CompletedAtNotIn applies the NotIn predicate on the "completed_at" field.
+func CompletedAtNotIn(vs ...time.Time) predicate.Request {
+	return predicate.Request(sql.FieldNotIn(FieldCompletedAt, vs...))
+}
+
+// CompletedAtGT applies the GT predicate on the "completed_at" field.
+func CompletedAtGT(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldGT(FieldCompletedAt, v))
+}
+
+// CompletedAtGTE applies the GTE predicate on the "completed_at" field.
+func CompletedAtGTE(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldGTE(FieldCompletedAt, v))
+}
+
+// CompletedAtLT applies the LT predicate on the "completed_at" field.
+func CompletedAtLT(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldLT(FieldCompletedAt, v))
+}
+
+// CompletedAtLTE applies the LTE predicate on the "completed_at" field.
+func CompletedAtLTE(v time.Time) predicate.Request {
+	return predicate.Request(sql.FieldLTE(FieldCompletedAt, v))
+}
+
+// CompletedAtIsNil applies the IsNil predicate on the "completed_at" field.
+func CompletedAtIsNil() predicate.Request {
+	return predicate.Request(sql.FieldIsNull(FieldCompletedAt))
+}
+
+// CompletedAtNotNil applies the NotNil predicate on the "completed_at" field.
+func CompletedAtNotNil() predicate.Request {
+	return predicate.Request(sql.FieldNotNull(FieldCompletedAt))
 }
 
 // StreamEQ applies the EQ predicate on the "stream" field.

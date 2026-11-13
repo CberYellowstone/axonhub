@@ -36,6 +36,9 @@ func (Request) Indexes() []ent.Index {
 			StorageKey("requests_by_trace_id_created_at"),
 		index.Fields("external_id", "api_key_id", "status", "created_at").
 			StorageKey("requests_by_external_id_api_key_id_status_created_at"),
+		// Cache metrics select completed requests by key and fixed completion time.
+		index.Fields("project_id", "api_key_id", "status", "completed_at", "id").
+			StorageKey("requests_by_project_key_completed"),
 		// Performance indexes for dashboard queries
 		index.Fields("created_at").
 			StorageKey("requests_by_created_at"),
@@ -109,6 +112,12 @@ func (Request) Fields() []ent.Field {
 			MaxLen(512),
 		// The status of the request.
 		field.Enum("status").Values("pending", "processing", "completed", "failed", "canceled"),
+		field.Time("completed_at").
+			Optional().
+			Nillable().
+			Immutable().
+			Annotations(entgql.Skip()).
+			Comment("First successful completion, set atomically by the request service; null for legacy requests"),
 		// Whether the request is a streaming request
 		field.Bool("stream").Default(false).Immutable(),
 		field.String("client_ip").Default("").Immutable(),

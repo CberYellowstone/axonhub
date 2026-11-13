@@ -62,6 +62,8 @@ type Request struct {
 	ExternalID string `json:"external_id,omitempty"`
 	// Status holds the value of the "status" field.
 	Status request.Status `json:"status,omitempty"`
+	// First successful completion, set atomically by the request service; null for legacy requests
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// ClientIP holds the value of the "client_ip" field.
@@ -200,7 +202,7 @@ func (*Request) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case request.FieldSource, request.FieldModelID, request.FieldReasoningEffort, request.FieldFormat, request.FieldExternalID, request.FieldStatus, request.FieldClientIP, request.FieldUserAgent, request.FieldContentStorageKey:
 			values[i] = new(sql.NullString)
-		case request.FieldCreatedAt, request.FieldUpdatedAt, request.FieldContentSavedAt:
+		case request.FieldCreatedAt, request.FieldUpdatedAt, request.FieldCompletedAt, request.FieldContentSavedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -347,6 +349,13 @@ func (_m *Request) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = request.Status(value.String)
+			}
+		case request.FieldCompletedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field completed_at", values[i])
+			} else if value.Valid {
+				_m.CompletedAt = new(time.Time)
+				*_m.CompletedAt = value.Time
 			}
 		case request.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -543,6 +552,11 @@ func (_m *Request) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
+	builder.WriteString(", ")
+	if v := _m.CompletedAt; v != nil {
+		builder.WriteString("completed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Stream))

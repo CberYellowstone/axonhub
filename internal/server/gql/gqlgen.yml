@@ -18,6 +18,7 @@ schema:
   - cost.graphql
   - analytics.graphql
   - plugin.graphql
+  - plugin_automation.graphql
 
 omit_gqlgen_version_in_file_notice: true
 
@@ -820,6 +821,56 @@ models:
   Plugin:
     model:
       - github.com/looplj/axonhub/internal/server/plugin.InstalledPlugin
+  PluginAutomationScope:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginAutomationScope
+  PluginAutomationScopeInput:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginAutomationScope
+  PluginProjectAccess:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginProjectAccess
+  PluginProjectAccessInput:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginProjectAccess
+  PluginScheduleSpec:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginScheduleSpec
+  PluginCacheUsageOptions:
+    model:
+      - github.com/looplj/axonhub/internal/server/plugin.CacheUsageOptions
+  PluginCacheUsagePage:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.CacheUsagePage
+  PluginCacheKeyUsage:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.CacheKeyUsage
+  PluginCacheUsageSample:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.CacheUsageSample
+  CacheReadStatus:
+    model:
+      - github.com/looplj/axonhub/llm.CacheReadStatus
+    enum_values:
+      unknown:
+        value: github.com/looplj/axonhub/llm.CacheReadUnknown
+      reported:
+        value: github.com/looplj/axonhub/llm.CacheReadReported
+  MetricCount:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int64
+  PluginKeySuspension:
+    model:
+      - github.com/looplj/axonhub/internal/objects.APIKeySuspensionResult
+  PluginKeySuspensionInput:
+    model:
+      - github.com/looplj/axonhub/internal/objects.APIKeySuspensionInput
+  PluginKeySuspensionFilter:
+    model:
+      - github.com/looplj/axonhub/internal/objects.APIKeySuspensionFilter
+  PluginKeySuspensionNotificationInput:
+    model:
+      - github.com/looplj/axonhub/internal/objects.PluginNotificationInput
   PluginManifestHooks:
     model:
       - github.com/looplj/axonhub/internal/server/plugin.ManifestHooks
@@ -850,6 +901,9 @@ models:
   PluginKVEntry:
     model:
       - github.com/looplj/axonhub/internal/server/plugin.KVEntry
+  PluginKVCASResult:
+    model:
+      - github.com/looplj/axonhub/internal/server/plugin.KVCASResult
   PluginUIPage:
     model:
       - github.com/looplj/axonhub/internal/server/plugin.UIPage

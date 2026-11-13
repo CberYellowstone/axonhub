@@ -159,6 +159,30 @@ func (f APIKeyProfileTemplateMutationRuleFunc) EvalMutation(ctx context.Context,
 	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.APIKeyProfileTemplateMutation", m)
 }
 
+// The APIKeySuspensionQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type APIKeySuspensionQueryRuleFunc func(context.Context, *ent.APIKeySuspensionQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f APIKeySuspensionQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.APIKeySuspensionQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.APIKeySuspensionQuery", q)
+}
+
+// The APIKeySuspensionMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type APIKeySuspensionMutationRuleFunc func(context.Context, *ent.APIKeySuspensionMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f APIKeySuspensionMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.APIKeySuspensionMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.APIKeySuspensionMutation", m)
+}
+
 // The ChannelQueryRuleFunc type is an adapter to allow the use of ordinary
 // functions as a query rule.
 type ChannelQueryRuleFunc func(context.Context, *ent.ChannelQuery) error
@@ -397,6 +421,54 @@ func (f PluginMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation
 		return f(ctx, m)
 	}
 	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.PluginMutation", m)
+}
+
+// The PluginNotificationQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type PluginNotificationQueryRuleFunc func(context.Context, *ent.PluginNotificationQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f PluginNotificationQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PluginNotificationQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.PluginNotificationQuery", q)
+}
+
+// The PluginNotificationMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type PluginNotificationMutationRuleFunc func(context.Context, *ent.PluginNotificationMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f PluginNotificationMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.PluginNotificationMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.PluginNotificationMutation", m)
+}
+
+// The PluginScheduleQueryRuleFunc type is an adapter to allow the use of ordinary
+// functions as a query rule.
+type PluginScheduleQueryRuleFunc func(context.Context, *ent.PluginScheduleQuery) error
+
+// EvalQuery return f(ctx, q).
+func (f PluginScheduleQueryRuleFunc) EvalQuery(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PluginScheduleQuery); ok {
+		return f(ctx, q)
+	}
+	return Denyf("ent/privacy: unexpected query type %T, expect *ent.PluginScheduleQuery", q)
+}
+
+// The PluginScheduleMutationRuleFunc type is an adapter to allow the use of ordinary
+// functions as a mutation rule.
+type PluginScheduleMutationRuleFunc func(context.Context, *ent.PluginScheduleMutation) error
+
+// EvalMutation calls f(ctx, m).
+func (f PluginScheduleMutationRuleFunc) EvalMutation(ctx context.Context, m ent.Mutation) error {
+	if m, ok := m.(*ent.PluginScheduleMutation); ok {
+		return f(ctx, m)
+	}
+	return Denyf("ent/privacy: unexpected mutation type %T, expect *ent.PluginScheduleMutation", m)
 }
 
 // The PluginStorageQueryRuleFunc type is an adapter to allow the use of ordinary
@@ -798,6 +870,8 @@ func queryFilter(q ent.Query) (Filter, error) {
 		return q.Filter(), nil
 	case *ent.APIKeyProfileTemplateQuery:
 		return q.Filter(), nil
+	case *ent.APIKeySuspensionQuery:
+		return q.Filter(), nil
 	case *ent.ChannelQuery:
 		return q.Filter(), nil
 	case *ent.ChannelModelPriceQuery:
@@ -817,6 +891,10 @@ func queryFilter(q ent.Query) (Filter, error) {
 	case *ent.OIDCIdentityQuery:
 		return q.Filter(), nil
 	case *ent.PluginQuery:
+		return q.Filter(), nil
+	case *ent.PluginNotificationQuery:
+		return q.Filter(), nil
+	case *ent.PluginScheduleQuery:
 		return q.Filter(), nil
 	case *ent.PluginStorageQuery:
 		return q.Filter(), nil
@@ -859,6 +937,8 @@ func mutationFilter(m ent.Mutation) (Filter, error) {
 		return m.Filter(), nil
 	case *ent.APIKeyProfileTemplateMutation:
 		return m.Filter(), nil
+	case *ent.APIKeySuspensionMutation:
+		return m.Filter(), nil
 	case *ent.ChannelMutation:
 		return m.Filter(), nil
 	case *ent.ChannelModelPriceMutation:
@@ -878,6 +958,10 @@ func mutationFilter(m ent.Mutation) (Filter, error) {
 	case *ent.OIDCIdentityMutation:
 		return m.Filter(), nil
 	case *ent.PluginMutation:
+		return m.Filter(), nil
+	case *ent.PluginNotificationMutation:
+		return m.Filter(), nil
+	case *ent.PluginScheduleMutation:
 		return m.Filter(), nil
 	case *ent.PluginStorageMutation:
 		return m.Filter(), nil

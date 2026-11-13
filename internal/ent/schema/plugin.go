@@ -88,6 +88,10 @@ func (Plugin) Fields() []ent.Field {
 			Optional().
 			Default(map[string]any{}).
 			Comment("Plugin configuration object validated against manifest.configSchema."),
+		field.JSON("automation_scope", objects.PluginAutomationScope{}).
+			Optional().
+			Default(objects.PluginAutomationScope{}).
+			Comment("Owner-approved project and API key ceiling for background automation. Empty denies all."),
 	}
 }
 

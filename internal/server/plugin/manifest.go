@@ -1,3 +1,11 @@
+// 职责: 校验插件 manifest 能力协商，并计算需要管理员确认的升级变化。
+// 关联文件:
+//
+//	internal/objects/plugin.go
+//	internal/server/plugin/manager.go
+//	internal/server/plugin/jsruntime.go
+//
+// 注意事项: 只登记实际实现的能力；新调度或缩短周期需要升级预览。
 // Package plugin parses .axplugin archives and validates manifest.json.
 // Parsing never writes the database. Installation is a later task.
 package plugin
@@ -41,6 +49,7 @@ type fieldGate struct {
 
 var fieldGates = []fieldGate{
 	{name: "events", open: true, message: errEventsNotEnabled},
+	{name: "schedules", open: true, message: "durable schedules are not enabled"},
 	{name: "hooks.request", open: true, message: errRequestHooksNotEnabled},
 	{name: "hooks.attempt", open: true, message: errRequestHooksNotEnabled},
 	{name: "hooks.response", message: errResponseHooksNotEnabled},
@@ -61,6 +70,8 @@ var pluginPermissionGates = []permissionGate{
 	{name: "read_channels", open: true},
 	{name: "read_requests", open: true},
 	{name: "read_dashboard", open: true},
+	{name: "read_usage_metrics", open: true},
+	{name: "manage_key_suspensions", open: true},
 	{name: "read_api_keys", open: true},
 	{name: "read_projects", open: true},
 	{name: "read_settings", open: true},
@@ -74,6 +85,26 @@ var supportedPluginAPIVersions = map[int]struct{}{
 	1: {},
 }
 
+// supportedCapabilities lists only host APIs implemented by this process.
+// Add a capability only together with its host implementation.
+var supportedCapabilities = map[string]struct{}{
+	"scheduler.durable.v1":     {},
+	"kv.cas.v1":                {},
+	"usage.metrics.v1":         {},
+	"key.suspensions.v1":       {},
+	"notifications.webhook.v1": {},
+}
+
+// HostCapabilities describes implemented contracts independently of build labels.
+func HostCapabilities() []string {
+	capabilities := make([]string, 0, len(supportedCapabilities))
+	for capability := range supportedCapabilities {
+		capabilities = append(capabilities, capability)
+	}
+	slices.Sort(capabilities)
+	return capabilities
+}
+
 // ReservedPluginIDs are builtin plugin ids. Uploaded packages cannot use them.
 // A later builtin registry may add ids during init.
 var ReservedPluginIDs = map[string]struct{}{
@@ -84,18 +115,20 @@ var ReservedPluginIDs = map[string]struct{}{
 // UI contributions the new manifest declares and the old one did not. Name, version,
 // description, axonhubVersion, entry, and title changes are not included.
 type ManifestDiff struct {
-	Permissions []string
-	Network     []string
-	Events      []string
-	Hooks       []string
-	Pages       []string
-	Actions     []string
+	Permissions          []string
+	Network              []string
+	Events               []string
+	Hooks                []string
+	Pages                []string
+	Actions              []string
+	Schedules            []string
+	RequiredCapabilities []string
 }
 
 // NeedsPreview reports whether an enabled plugin must ask the owner before upgrade.
 // The enabled check itself belongs to the install transaction.
 func (d ManifestDiff) NeedsPreview() bool {
-	return len(d.Permissions) > 0 || len(d.Network) > 0 || len(d.Events) > 0 || len(d.Hooks) > 0 || len(d.Pages) > 0 || len(d.Actions) > 0
+	return len(d.Permissions) > 0 || len(d.Network) > 0 || len(d.Events) > 0 || len(d.Hooks) > 0 || len(d.Pages) > 0 || len(d.Actions) > 0 || len(d.Schedules) > 0 || len(d.RequiredCapabilities) > 0
 }
 
 // UpgradePlan is the pure result of comparing two manifests.
@@ -146,6 +179,15 @@ func ValidateManifest(manifest *objects.PluginManifest, axonhubVersion string) e
 	if err := checkEvents(manifest.Events); err != nil {
 		return err
 	}
+	return checkRequiredCapabilities(manifest.RequiredCapabilities)
+}
+
+func checkRequiredCapabilities(required []string) error {
+	for _, capability := range required {
+		if _, ok := supportedCapabilities[capability]; !ok {
+			return fmt.Errorf("required capability %q is not supported", capability)
+		}
+	}
 	return nil
 }
 
@@ -163,13 +205,31 @@ func DiffManifest(old, next *objects.PluginManifest) ManifestDiff {
 		next = &objects.PluginManifest{}
 	}
 	return ManifestDiff{
-		Permissions: addedStrings(next.Permissions, old.Permissions),
-		Network:     addedStrings(next.NetworkGrants(), old.NetworkGrants()),
-		Events:      addedStrings(next.Events, old.Events),
-		Hooks:       addedHooks(old.Hooks, next.Hooks),
-		Pages:       addedStrings(pageKeys(next.UI), pageKeys(old.UI)),
-		Actions:     addedActions(old.UI, next.UI),
+		Permissions:          addedStrings(next.Permissions, old.Permissions),
+		Network:              addedStrings(next.NetworkGrants(), old.NetworkGrants()),
+		Events:               addedStrings(next.Events, old.Events),
+		Hooks:                addedHooks(old.Hooks, next.Hooks),
+		Pages:                addedStrings(pageKeys(next.UI), pageKeys(old.UI)),
+		Actions:              addedActions(old.UI, next.UI),
+		Schedules:            addedSchedules(old.Schedules, next.Schedules),
+		RequiredCapabilities: addedStrings(next.RequiredCapabilities, old.RequiredCapabilities),
 	}
+}
+
+func addedSchedules(old, next []objects.PluginScheduleSpec) []string {
+	previous := map[string]int{}
+	for _, schedule := range old {
+		previous[schedule.Key] = schedule.IntervalSeconds
+	}
+	var added []string
+	for _, schedule := range next {
+		before, exists := previous[schedule.Key]
+		if !exists || schedule.IntervalSeconds < before {
+			added = append(added, schedule.Key)
+		}
+	}
+	slices.Sort(added)
+	return added
 }
 
 // ConvergePermissions applies the upgrade grant rule.
@@ -320,6 +380,8 @@ func closedFieldPresent(manifest *objects.PluginManifest, name string) bool {
 	switch name {
 	case "events":
 		return manifest.EventsPresent
+	case "schedules":
+		return len(manifest.Schedules) > 0
 	case "hooks.request":
 		return manifest.Hooks != nil && manifest.Hooks.Request.IsEnabled()
 	case "hooks.attempt":

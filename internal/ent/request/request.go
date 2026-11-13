@@ -56,6 +56,8 @@ const (
 	FieldExternalID = "external_id"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldCompletedAt holds the string denoting the completed_at field in the database.
+	FieldCompletedAt = "completed_at"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldClientIP holds the string denoting the client_ip field in the database.
@@ -165,6 +167,7 @@ var Columns = []string{
 	FieldChannelID,
 	FieldExternalID,
 	FieldStatus,
+	FieldCompletedAt,
 	FieldStream,
 	FieldClientIP,
 	FieldUserAgent,
@@ -346,6 +349,11 @@ func ByExternalID(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByCompletedAt orders the results by the completed_at field.
+func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCompletedAt, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.

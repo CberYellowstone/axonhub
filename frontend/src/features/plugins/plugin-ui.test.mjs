@@ -1,7 +1,10 @@
+import React from 'react';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import test from 'node:test';
+import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 
 const dir = import.meta.dirname;
@@ -76,10 +79,7 @@ test('bridge replies match protocol, version, and the current session', () => {
   };
   assert.deepEqual(ui.matchPluginBridgeMessage(pageError, 's1'), { type: 'pageError', message: 'boom' });
   assert.equal(ui.matchPluginBridgeMessage(pageError, 'other'), null);
-  assert.equal(
-    ui.matchPluginBridgeMessage({ protocol: ui.PLUGIN_UI_PROTOCOL, version: 1, type: 'reply', sessionId: 's1' }, 's1'),
-    null
-  );
+  assert.equal(ui.matchPluginBridgeMessage({ protocol: ui.PLUGIN_UI_PROTOCOL, version: 1, type: 'reply', sessionId: 's1' }, 's1'), null);
 });
 
 test('theme resolution and plugin HTTP errors stay stable', () => {
@@ -182,10 +182,208 @@ test('plugin page copy exists in en and zh-CN', () => {
     'plugins.grant.networkWarning',
     'plugins.grant.new',
     'plugins.fields.grantedNetwork',
+    'plugins.grant.addedSchedules',
+    'plugins.grant.addedRequiredCapabilities',
+    'plugins.grant.keySuspensionWarning',
+    'plugins.grant.keySuspensionAccess',
+    'plugins.grant.usageMetricsHint',
+    'plugins.config.ownerOnly',
+    'plugins.automation.title',
+    'plugins.automation.schedules',
+    'plugins.automation.scheduleInterval',
+    'plugins.automation.requiredCapabilities',
+    'plugins.automation.scope',
+    'plugins.automation.scopeHint',
+    'plugins.automation.scopeDenied',
+    'plugins.automation.project',
+    'plugins.automation.allKeys',
+    'plugins.automation.selectedKeys',
+    'plugins.automation.noKeys',
+    'plugins.automation.excludedKeys',
   ]) {
     assert.equal(typeof en[key], 'string', `Missing English translation: ${key}`);
     assert.equal(typeof zh[key], 'string', `Missing Chinese translation: ${key}`);
     assert.notEqual(en[key], '', `Empty English translation: ${key}`);
     assert.notEqual(zh[key], '', `Empty Chinese translation: ${key}`);
+  }
+});
+
+const require = createRequire(import.meta.url);
+const copy = JSON.parse(readFileSync(join(dir, '../../locales/en/plugins.json'), 'utf8'));
+const translate = (key, values = {}) => (copy[key] ?? key).replace(/{{(\w+)}}/g, (_, name) => values[name] ?? '');
+
+// Render real component branches; replace only external UI shells and data hooks.
+function loadPluginComponent(file) {
+  const source = ts.transpileModule(readFileSync(join(dir, file), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const shell = ({ children, variant, className }) => React.createElement('div', { 'data-variant': variant, className }, children);
+  const mocks = {
+    'react-i18next': { useTranslation: () => ({ t: translate }) },
+    '@tabler/icons-react': { IconAlertTriangle: () => null, IconArrowRight: () => null, IconPencil: () => null },
+    '@/lib/utils': { cn: (...items) => items.filter(Boolean).join(' ') },
+    './plugin-visuals': { PluginAvatar: () => null, PluginStatus: () => null },
+    './plugin-config-form': { PluginConfigForm: () => React.createElement('button', null, 'CONFIG_FORM') },
+  };
+  const exports = {};
+  new Function('require', 'exports', source)((name) => {
+    if (name in mocks) return mocks[name];
+    if (name.startsWith('@/components/ui/')) return new Proxy({}, { get: () => shell });
+    return require(name);
+  }, exports);
+  return exports;
+}
+
+const { PluginGrantDialog } = loadPluginComponent('components/plugin-grant-dialog.tsx');
+const { PluginDetailSheet } = loadPluginComponent('components/plugin-detail-sheet.tsx');
+const renderGrant = (props) =>
+  renderToStaticMarkup(
+    React.createElement(PluginGrantDialog, {
+      open: true,
+      onOpenChange() {},
+      mode: 'upgrade',
+      pluginID: 'guard',
+      pluginName: 'Guard',
+      permissions: [],
+      network: [],
+      initialGranted: [],
+      initialGrantedNetwork: [],
+      onConfirm() {},
+      ...props,
+    })
+  );
+const basePlugin = {
+  id: '1',
+  pluginID: 'guard',
+  name: 'Guard',
+  version: '1',
+  description: '',
+  builtin: false,
+  enabled: true,
+  priority: 0,
+  runtimeStatus: 'active',
+  runtimeError: '',
+  grantedPermissions: [],
+  manifestPermissions: [],
+  grantedNetwork: [],
+  manifestNetwork: [],
+  manifestHooks: {},
+  manifestSchedules: [],
+  requiredCapabilities: [],
+  automationScope: { projects: [] },
+  configFields: [],
+  config: {},
+};
+const renderDetail = (plugin, props = {}) =>
+  renderToStaticMarkup(
+    React.createElement(PluginDetailSheet, {
+      plugin: { ...basePlugin, ...plugin },
+      canWrite: true,
+      canManage: false,
+      onEditPermissions() {},
+      onOpenChange() {},
+      ...props,
+    })
+  );
+
+test('upgrade confirmation shows schedules and host capability requirements rather than no additions', () => {
+  const html = renderGrant({
+    preview: {
+      currentVersion: '1',
+      newVersion: '2',
+      permissions: [],
+      network: [],
+      events: [],
+      hooks: [],
+      pages: [],
+      actions: [],
+      schedules: ['cache-check'],
+      requiredCapabilities: ['usage_metrics.v1'],
+    },
+  });
+  for (const text of ['New background schedules', 'cache-check', 'New required host capabilities', 'usage_metrics.v1']) {
+    assert.ok(html.includes(text), text);
+  }
+  assert.ok(!html.includes(copy['plugins.grant.noAdditions']));
+});
+
+test('key suspension permission is high risk without a write prefix; metrics read access stays non-destructive', () => {
+  const html = renderGrant({ mode: 'edit', permissions: ['manage_key_suspensions', 'read_usage_metrics'] });
+  assert.ok(html.includes(copy['plugins.grant.keySuspensionWarning']));
+  assert.ok(html.includes(copy['plugins.grant.usageMetricsHint']));
+  assert.match(html, /text-destructive[^>]*>manage_key_suspensions/);
+  assert.doesNotMatch(html, /text-destructive[^>]*>read_usage_metrics/);
+  assert.ok(html.includes('High risk'));
+});
+
+test('detail exposes manifest schedules, capabilities and deny-by-default scope', () => {
+  const html = renderDetail({
+    manifestSchedules: [{ key: 'cache-check', intervalSeconds: 30 }],
+    requiredCapabilities: ['usage_metrics.v1'],
+  });
+  for (const text of ['cache-check · every 30 seconds', 'usage_metrics.v1', copy['plugins.automation.scopeDenied']]) {
+    assert.ok(html.includes(text), text);
+  }
+  const scoped = renderDetail({
+    automationScope: {
+      projects: [
+        { projectId: 7, allKeys: true, apiKeyIds: [], excludedApiKeyIds: [8] },
+        { projectId: 9, allKeys: false, apiKeyIds: [10], excludedApiKeyIds: [] },
+        { projectId: 11, allKeys: false, apiKeyIds: [], excludedApiKeyIds: [] },
+      ],
+    },
+  });
+  for (const text of [
+    'Project #7',
+    'All keys in this project, except excluded keys',
+    'Excluded key IDs: 8',
+    'Approved key IDs: 10',
+    'No keys approved in this project',
+  ]) {
+    assert.ok(scoped.includes(text), text);
+  }
+});
+
+test('only granted key-suspending plugins lock configuration for non-owners', () => {
+  const plugin = { grantedPermissions: ['manage_key_suspensions'] };
+  const readonly = renderDetail(plugin);
+  assert.ok(readonly.includes(copy['plugins.config.ownerOnly']));
+  assert.ok(!readonly.includes('CONFIG_FORM'));
+  assert.match(readonly, /data-variant="destructive"[^>]*>manage_key_suspensions/);
+  assert.ok(renderDetail(plugin, { canManage: true }).includes('CONFIG_FORM'));
+  assert.ok(renderDetail({ manifestPermissions: ['manage_key_suspensions'] }).includes('CONFIG_FORM'));
+});
+
+test('plugin query and every returning mutation carry automation fields and both install previews carry additions', () => {
+  const text = readFileSync(join(dir, 'data/plugins.ts'), 'utf8');
+  const ast = ts.createSourceFile('plugins.ts', text, ts.ScriptTarget.Latest, true);
+  const declarations = new Map();
+  for (const statement of ast.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations)
+      declarations.set(declaration.name.getText(ast), declaration.initializer?.getText(ast));
+  }
+  const fields = declarations.get('PLUGIN_FIELDS');
+  for (const field of [
+    'manifestSchedules',
+    'key intervalSeconds',
+    'requiredCapabilities',
+    'automationScope',
+    'projectId allKeys apiKeyIds excludedApiKeyIds',
+  ]) {
+    assert.ok(fields.includes(field), field);
+  }
+  for (const name of [
+    'PLUGINS_QUERY',
+    'INSTALL_PLUGIN_MUTATION',
+    'INSTALL_PLUGIN_FROM_MARKET_MUTATION',
+    'ENABLE_PLUGIN_MUTATION',
+    'DISABLE_PLUGIN_MUTATION',
+    'UPDATE_PLUGIN_SETTINGS_MUTATION',
+  ]) {
+    assert.ok(declarations.get(name).includes('${PLUGIN_FIELDS}'), name);
+  }
+  for (const name of ['INSTALL_PLUGIN_MUTATION', 'INSTALL_PLUGIN_FROM_MARKET_MUTATION']) {
+    assert.match(declarations.get(name), /upgradePreview\s*{[^}]*\bschedules\b[^}]*\brequiredCapabilities\b/);
   }
 });

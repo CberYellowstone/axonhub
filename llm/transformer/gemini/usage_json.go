@@ -3,6 +3,7 @@ package gemini
 import (
 	"encoding/json"
 
+	"github.com/looplj/axonhub/llm"
 	"github.com/looplj/axonhub/llm/internal/pkg/xjson"
 )
 
@@ -18,5 +19,6 @@ func (u *UsageMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	u.Cost = xjson.ParseOptionalFloat64(aux.Cost)
+	u.CacheReadStatus = llm.ParseCacheReadStatus(data, []string{"cachedContentTokenCount"})
 	return nil
 }

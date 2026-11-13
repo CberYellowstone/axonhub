@@ -240,6 +240,20 @@ func (_c *RequestCreate) SetStatus(v request.Status) *RequestCreate {
 	return _c
 }
 
+// SetCompletedAt sets the "completed_at" field.
+func (_c *RequestCreate) SetCompletedAt(v time.Time) *RequestCreate {
+	_c.mutation.SetCompletedAt(v)
+	return _c
+}
+
+// SetNillableCompletedAt sets the "completed_at" field if the given value is not nil.
+func (_c *RequestCreate) SetNillableCompletedAt(v *time.Time) *RequestCreate {
+	if v != nil {
+		_c.SetCompletedAt(*v)
+	}
+	return _c
+}
+
 // SetStream sets the "stream" field.
 func (_c *RequestCreate) SetStream(v bool) *RequestCreate {
 	_c.mutation.SetStream(v)
@@ -649,6 +663,10 @@ func (_c *RequestCreate) createSpec() (*Request, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(request.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.CompletedAt(); ok {
+		_spec.SetField(request.FieldCompletedAt, field.TypeTime, value)
+		_node.CompletedAt = &value
 	}
 	if value, ok := _c.mutation.Stream(); ok {
 		_spec.SetField(request.FieldStream, field.TypeBool, value)
@@ -1178,6 +1196,9 @@ func (u *RequestUpsertOne) UpdateNewValues() *RequestUpsertOne {
 		}
 		if _, exists := u.create.mutation.RequestBody(); exists {
 			s.SetIgnore(request.FieldRequestBody)
+		}
+		if _, exists := u.create.mutation.CompletedAt(); exists {
+			s.SetIgnore(request.FieldCompletedAt)
 		}
 		if _, exists := u.create.mutation.Stream(); exists {
 			s.SetIgnore(request.FieldStream)
@@ -1749,6 +1770,9 @@ func (u *RequestUpsertBulk) UpdateNewValues() *RequestUpsertBulk {
 			}
 			if _, exists := b.mutation.RequestBody(); exists {
 				s.SetIgnore(request.FieldRequestBody)
+			}
+			if _, exists := b.mutation.CompletedAt(); exists {
+				s.SetIgnore(request.FieldCompletedAt)
 			}
 			if _, exists := b.mutation.Stream(); exists {
 				s.SetIgnore(request.FieldStream)

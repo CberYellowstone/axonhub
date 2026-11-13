@@ -88,6 +88,12 @@ func (h *hostCall) build(config, state, requestJSON, attemptJSON json.RawMessage
 	if err := defineHostFn(h.rt, kv, "get", 1, h.kvGet); err != nil {
 		return moejs.Undefined(), err
 	}
+	if err := defineHostFn(h.rt, kv, "getEntry", 1, h.kvGetEntry); err != nil {
+		return moejs.Undefined(), err
+	}
+	if err := defineHostFn(h.rt, kv, "compareAndSet", 3, h.kvCompareAndSet); err != nil {
+		return moejs.Undefined(), err
+	}
 	if err := defineHostFn(h.rt, kv, "set", 2, h.kvSet); err != nil {
 		return moejs.Undefined(), err
 	}
@@ -137,6 +143,9 @@ func (h *hostCall) build(config, state, requestJSON, attemptJSON json.RawMessage
 		}
 	}
 	if err := h.attachEventAPI(ctxObj); err != nil {
+		return moejs.Undefined(), err
+	}
+	if err := h.attachAutomationAPI(ctxObj); err != nil {
 		return moejs.Undefined(), err
 	}
 	return engine.ObjectValue(ctxObj), nil
@@ -300,6 +309,9 @@ func (h *hostCall) enter(write bool) error {
 	}
 	if err := h.rt.Realm().CheckInterrupt(); err != nil {
 		return err
+	}
+	if err := validateScheduleCall(h.ctx); err != nil {
+		return h.fail(hostInvalidState, "scheduled plugin call is no longer current")
 	}
 	if write {
 		if err := h.beginWrite(); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -281,27 +282,54 @@ func (s *AuthService) AuthenticateAPIKey(ctx context.Context, key string) (*ent.
 		return s.APIKeyService.GetAPIKey(bypassCtx, key)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get api key: %w", err)
+		if ent.IsNotFound(err) || errors.Is(err, ErrInvalidAPIKey) {
+			return nil, fmt.Errorf("failed to get api key: %w", err)
+		}
+		return nil, fmt.Errorf("%w: failed to load API key: %w", ErrAPIKeyGateUnavailable, err)
 	}
+	return s.authenticateLiveAPIKey(ctx, apiKey, key, false)
+}
 
-	if apiKey.Status != apikey.StatusEnabled {
-		return nil, fmt.Errorf("api key not enabled: %w", ErrInvalidAPIKey)
-	}
-
-	proj, err := apiKey.Project(ctx)
+// authenticateLiveAPIKey is deliberately not cached. A stale enabled cache row,
+// rotated credential, deleted key, or changed project cannot bypass this gate.
+// Returning the SQL snapshot also keeps current IP restrictions and scopes.
+func (s *AuthService) authenticateLiveAPIKey(ctx context.Context, cached *ent.APIKey, credential string, noAuth bool) (*ent.APIKey, error) {
+	client := s.APIKeyService.entFromContext(ctx)
+	live, err := authz.RunAsHost(ctx, client, "authenticate live API key gate", func(hostCtx context.Context) (*ent.APIKey, error) {
+		live, err := client.APIKey.Query().Where(
+			apikey.IDEQ(cached.ID), apikey.KeyEQ(credential), apikey.ProjectIDEQ(cached.ProjectID),
+			apikey.DeletedAtEQ(0),
+		).WithProject().Only(hostCtx)
+		if ent.IsNotFound(err) {
+			return nil, ErrInvalidAPIKey
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrAPIKeyGateUnavailable, err)
+		}
+		if live.Status != apikey.StatusEnabled {
+			return nil, fmt.Errorf("api key not enabled: %w", ErrInvalidAPIKey)
+		}
+		if live.Edges.Project == nil || live.Edges.Project.Status != project.StatusActive || live.Edges.Project.DeletedAt != 0 {
+			return nil, fmt.Errorf("api key project not valid: %w", ErrInvalidAPIKey)
+		}
+		if live.Type == apikey.TypeNoauth && !noAuth {
+			return nil, fmt.Errorf("noauth api key is only available when api auth is disabled: %w", ErrInvalidAPIKey)
+		}
+		if live.Type != apikey.TypeNoauth && noAuth {
+			return nil, fmt.Errorf("noauth authentication requires a noauth api key: %w", ErrInvalidAPIKey)
+		}
+		if err := NewAPIKeySuspensionService(client).Check(hostCtx, live.ID, live.ProjectID); err != nil {
+			return nil, err
+		}
+		return live, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get api key project: %w", err)
+		var suspended *APIKeySuspendedError
+		if !errors.Is(err, ErrInvalidAPIKey) && !errors.Is(err, ErrAPIKeyGateUnavailable) && !errors.As(err, &suspended) {
+			return nil, fmt.Errorf("%w: %w", ErrAPIKeyGateUnavailable, err)
+		}
 	}
-
-	if proj == nil || proj.Status != project.StatusActive {
-		return nil, fmt.Errorf("api key project not valid: %w", ErrInvalidAPIKey)
-	}
-
-	if apiKey.Type == apikey.TypeNoauth {
-		return nil, fmt.Errorf("noauth api key is only available when api auth is disabled: %w", ErrInvalidAPIKey)
-	}
-
-	return apiKey, nil
+	return live, err
 }
 
 func (s *AuthService) AuthenticateNoAuth(ctx context.Context) (*ent.APIKey, error) {
@@ -313,21 +341,7 @@ func (s *AuthService) AuthenticateNoAuth(ctx context.Context) (*ent.APIKey, erro
 		return s.APIKeyService.EnsureNoAuthAPIKey(bypassCtx)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to ensure noauth api key: %w", err)
+		return nil, fmt.Errorf("%w: failed to ensure noauth api key: %w", ErrAPIKeyGateUnavailable, err)
 	}
-
-	if apiKey.Status != apikey.StatusEnabled {
-		return nil, fmt.Errorf("api key not enabled: %w", ErrInvalidAPIKey)
-	}
-
-	proj, err := apiKey.Project(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get api key project: %w", err)
-	}
-
-	if proj == nil || proj.Status != project.StatusActive {
-		return nil, fmt.Errorf("api key project not valid: %w", ErrInvalidAPIKey)
-	}
-
-	return apiKey, nil
+	return s.authenticateLiveAPIKey(ctx, apiKey, apiKey.Key, true)
 }

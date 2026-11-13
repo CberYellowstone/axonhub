@@ -11,6 +11,7 @@ AxonHub 插件是一个 `.axplugin` 压缩包。Owner 在「插件」页（`/plu
 - **页面。** `ui.pages` 的每一项是侧栏入口，也是一整页 iframe。
 - **插件 KV。** `ctx.kv` 和页面上的 GraphQL KV 字段读写同一批记录。键属于这一次安装。
 - **宿主代发的请求。** `plugin.js` 里用 `ctx.fetch`，页面里用 `axonhub.fetch`。目标必须匹配已授予的 `network` 规则。
+- **后台自动化。** manifest 声明 `schedules`，导出 `onSchedule(ctx, job)`；在 Owner 独立批准的范围内读取缓存指标、暂停 Key 并入队通知，见[后台自动化](#后台自动化与缓存指标)。
 
 `onRequest` 可以修改 `model`。随后的模型权限检查和模型映射按新模型执行。两个请求钩子都保持 `stream` 与输入一致。`onAttempt` 还要保持当次输入的 `model` 不变。
 
@@ -105,7 +106,7 @@ export function onEvent(ctx, event) {
 
 ```text
 manifest.json
-plugin.js          可选；声明了 events 或 hooks 时必须有
+plugin.js          可选；声明了 events、hooks 或 schedules 时必须有
 ui/**              html、js、css、svg、png、woff2
 ```
 
@@ -152,13 +153,15 @@ go run -C cmd/pack-plugin . ../../plugins/examples/<name>
 | `permissions` | 否 | 取下面的权限名。省略为 `[]` |
 | `network` | 否 | 最多 32 条。省略为 `[]` |
 | `events` | 否 | 取上面 8 种事件名。非空时必须 `export function onEvent` |
+| `schedules` | 否 | 最多 8 个 `{ key, intervalSeconds }`；key 唯一且符合页面 key 格式，间隔 60–86400 秒；非空时必须导出 `onSchedule` |
+| `requiredCapabilities` | 否 | 所需宿主能力名数组；不支持的能力导致安装失败，管理查询 `pluginHostCapabilities` 返回已实现能力 |
 | `hooks.request` | 否 | 对象：enabled 必填；true 时 requestTypes 必须非空且导出 onRequest；false 保留配置但不执行 |
 | `hooks.attempt` | 否 | 对象：enabled 必填；true 时 apiFormats 必须非空且导出 onAttempt；false 保留配置但不执行 |
 | `configSchema` | 否 | JSON Schema 对象，见下文 |
 | `ui.pages` | 否 | 侧栏页面，见下文 |
 | `ui.actions` | 否 | 全局工具栏操作，点击打开插件弹窗 |
 
-已开放的权限：`read_channels`、`read_requests`、`read_dashboard`、`read_api_keys`、`read_projects`、`read_settings`、`write_channels`、`webhook`。出站 URL 写在 `network`。`read_plugins` 和 `write_plugins` 是用户 scope，不是插件权限。KV 不占用权限。
+已开放的权限：`read_channels`、`read_requests`、`read_dashboard`、`read_api_keys`、`read_projects`、`read_settings`、`write_channels`、`webhook`、`read_usage_metrics`、`manage_key_suspensions`。出站 URL 写在 `network`。`read_plugins` 和 `write_plugins` 是用户 scope，不是插件权限。KV 不占用权限。`manage_key_suspensions` 是高风险权限，可临时或永久阻断批准范围内的 Key；`read_usage_metrics` 可读取非敏感聚合指标，两者的项目与 Key 范围由 Owner 单独批准。
 
 一条 `network` 规则要么是精确的 `https` URL，要么是 `{ "regex": "^https://api\\.example\\.com/v1/items/[0-9]+$" }`。精确 URL 必须带 path，不能有 userinfo、query 或 fragment，并且只匹配这条 path。正则对去掉 query 和 fragment 后的 URL 做全匹配，最长 256 个字符。实际请求仍可以带 query。宿主不跟随重定向；301、302、303、307、308 会使 `ctx.fetch` 和 `axonhub.fetch` 以 `INVALID_STATE` 拒绝 Promise。
 
@@ -170,7 +173,7 @@ go run -C cmd/pack-plugin . ../../plugins/examples/<name>
 
 宿主只调用命名导出。不会从 `export default` 里发现钩子，也没有注册函数。manifest 声明了的钩子必须导出为函数。manifest 没有声明的导出不会被调用。
 
-所有入口统一 ctx 在前：`onEvent(ctx, event)`、`onRequest(ctx, request)`、`onAttempt(ctx, body)`。
+所有入口统一 ctx 在前：`onEvent(ctx, event)`、`onRequest(ctx, request)`、`onAttempt(ctx, body)`、`onSchedule(ctx, job)`。
 
 `onRequest` 按 RequestType 匹配，接收统一请求公开字段的 JS 对象，沿用 snake_case。内部记账字段和音频、图片等非公开数据由宿主保留，不参与 replace/patch。`onAttempt` 按本次实际出站 APIFormat 匹配，接收目标协议的 JSON body 对象，不是 llm.Request、字符串或字节数组。multipart、二进制及非对象 JSON body 不进入 attempt。
 
@@ -282,6 +285,8 @@ const raw = ctx.kv.get("cursor");
 | 调用 | 返回值 |
 | --- | --- |
 | `ctx.kv.get(key, { namespace }?)` | 字符串值；不存在或已过期时为 `null` |
+| `ctx.kv.getEntry(key, { namespace }?)` | 带 `revision` 的 `KVEntry`；不存在或已过期时为 `null` |
+| `ctx.kv.compareAndSet(key, expectedRevision, value, { namespace, ttlSeconds }?)` | `{ swapped, entry }`；版本匹配时写入字符串，冲突时为 `{ swapped: false, entry: null }` |
 | `ctx.kv.set(key, value, { namespace, ttlSeconds }?)` | `undefined`；value 必须是字符串，JSON 对象先 `JSON.stringify` |
 | `ctx.kv.delete(key, { namespace }?)` | boolean，是否删除了记录 |
 | `ctx.kv.list({ namespace, prefix, first, after }?)` | 下述 `KVPage` 对象 |
@@ -293,6 +298,7 @@ type KVEntry = {
   namespace: string;
   key: string;
   value: string;
+  revision: string;
   updatedAt: string;
   expiresAt: string | null;
 };
@@ -318,6 +324,55 @@ export function onEvent(ctx, event) {
 ```
 
 页面通过 `axonhub.graphql` 调用 `pluginKVList(namespace, prefix, first, after)`，返回字段也是 `entries` 和 `nextCursor`，但需要在 GraphQL selection 中显式选择。GraphQL 的 `after` 可以传 `null` 表示第一页。`pluginKV` 返回完整条目或 `null`，`setPluginKV` 返回条目，`deletePluginKV` 返回 boolean；与返回字符串的 `ctx.kv.get` 区分。
+
+## 后台自动化与缓存指标
+
+后台自动化使用独立的权限、范围和宿主能力契约。[自动化接口说明](../../solutions/plugin-system/automation.md)列出完整字段、限制、Owner scope mutation、通知事务边界与管理员恢复示例。能力名为 `scheduler.durable.v1`、`usage.metrics.v1`、`key.suspensions.v1`、`kv.cas.v1`、`notifications.webhook.v1`，按实际使用写入 `requiredCapabilities`。
+
+清单片段：
+
+```json
+{
+  "permissions": ["read_usage_metrics"],
+  "schedules": [{ "key": "check-cache", "intervalSeconds": 300 }],
+  "requiredCapabilities": ["scheduler.durable.v1", "usage.metrics.v1"]
+}
+```
+
+```js
+export function onSchedule(ctx, job) {
+  if (job.key !== "check-cache") return;
+  const page = ctx.usage.cacheStats({
+    projectId: 7, keyIds: [101], windowSeconds: 3600,
+    lastRequests: 50, minSamples: 50, lowThreshold: 0.2,
+  });
+  for (const item of page.items) {
+    if (!item.sampleComplete || item.cacheRate === null) continue;
+    ctx.log.info("cache metrics", {
+      keyId: item.keyId, cacheRate: item.cacheRate,
+      latestRequestId: item.latestRequestId,
+    });
+  }
+}
+```
+
+`job` 为 `{ key, runId, scheduledAt, attempt }`。调度至少一次执行，失败重试复用 `runId`，遗漏周期合并，单次预算含等待 VM 共 10 秒。`ctx.usage.cacheStats(options)` 同步返回统计；自动化 options 必须是最多 64 KiB 的 JSON 对象，未知字段和错误类型被拒绝。一次查询一个正整数项目，`keyIds` 与 `allKeys: true` 二选一；`excludeKeyIds` 要求 `allKeys`。每页最多 100 个 Key，各 ID 筛选列表最多 1000 项；翻页复用返回的 `end`，将 `nextAfterKeyId` 传为 `afterKeyId`。
+
+`windowSeconds` 上限 7776000（90 天），`lastRequests` 上限 1000，两者至少提供一项；同时设置时，在时间窗口内取每个 Key 的最近 N 次。`minSamples` 默认 N，纯窗口默认 1。需要时间条件与请求数条件的 AND/OR 时分别查询后由插件组合。默认查询 API 来源的已完成请求，按首次完成时由数据库时钟固定的 `completed_at` 和请求 ID 排序。旧请求缺少完成时间时，以固定 `created_at` 定位并强制 unknown；样本的公开 `createdAt` 表示该固定观察时间。元数据或附件下载更新保持原窗口归属。
+
+`cacheRate` 为有效样本缓存 Token 总量除以包含缓存 Token 的输入总量。缺失 usage 或未报告缓存计数计为 unknown；已报告但输入为 0、缓存计数为负或超过输入计为 invalid。unknown/invalid 均保留在最近 N 次中并打断连续低命中。`enoughSamples` 仅检查有效数量；`sampleComplete` 还要求全部选定记录有效且最近 N 次取满 N。动作规则同时检查输入 Token 下限及 `validCount / count` 覆盖率，保留只记录模式。明细最多 1000 条，检查 `samplesTruncated`、`trailingTruncated`。超过 JavaScript 安全整数范围的统计会报错，应收窄查询；失败时停止处罚。
+
+Owner 通过 `/admin/graphql` 的 `setPluginAutomationScope(id: ID!, scope: PluginAutomationScopeInput!)` 整体替换范围，空项目列表默认拒绝。Plugin `id` 使用 `plugins` 查询返回的 GUID；scope 的项目及 Key 使用正整数。`allKeys` 动态包含新 Key，排除项优先。管理详情展示范围，范围编辑通过 GraphQL 完成。已获 `manage_key_suspensions` 的插件配置及页面 KV 写入由直接 Owner 管理；页面指标取当前用户 dashboard 读取权限与安装范围的交集，当前系统级 `read_dashboard` 检查要求相应系统权限，仅有同名项目成员权限不足以满足。
+
+| 接口 | 语义 |
+| --- | --- |
+| `ctx.keySuspensions.apply(input)` | `onEvent`/`onSchedule` 中可用，需 `manage_key_suspensions`；输入含正整数 `apiKeyId`、`projectId`、`idempotencyKey`、`reason`、`evidence`；临时设置 1–31536000 秒，或显式 `permanent: true` 且时长为 0 |
+| `ctx.keySuspensions.release(id)` / `list(filter)` | 解除或查询本安装且仍在当前范围内的暂停；list 按 ID 倒序，`beforeId` 分页，每页最多 100 条 |
+| `ctx.notifications.enqueue(input)` | `onEvent`/`onSchedule` 中可用，需 `webhook`；输入 `{ targetName, payload, idempotencyKey, suspensionId?, evidence? }`，返回 `{ id, eventId, status }` |
+
+暂停创建可附带 `notification: { targetName, payload }`，暂停与通知入队同事务，宿主绑定通知身份和证据。独立宿主调用各自提交，跨 KV、暂停和通知调用需要对账恢复。通知使用已有目标，HTTP 至少一次投递，接收端按 `eventId` 去重。个人及 `noauth` Key 不可暂停。暂停叠加于人工状态；停用或卸载插件后永久暂停继续阻断，临时暂停自然到期。管理员通过 `apiKeySuspensions` / `releaseAPIKeySuspension` 查询和解除遗留暂停。
+
+状态使用 `ctx.kv.getEntry` 读取 revision，再用 `compareAndSet` 写入；`expectedRevision: null` 仅创建，更新时回传原 revision，冲突后有界重读。动作幂等键包含规则版本、Key ID 和 `latestRequestId`。暂停到期或管理员解除后，按完成时间检查足够的恢复后新样本，并与暂停历史对账；单独使用 `runId` 会使不同周期对旧证据重新处罚。相同幂等键重放保留原暂停的到期与解除状态。
 
 ## 全局工具栏操作
 

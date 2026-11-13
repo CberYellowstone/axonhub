@@ -1023,6 +1023,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddUserToProject                      func(childComplexity int, input AddUserToProjectInput) int
 		ApplyChannelOverrideTemplate          func(childComplexity int, input ApplyChannelOverrideTemplateInput) int
+		ApplyPluginKeySuspension              func(childComplexity int, input objects.APIKeySuspensionInput) int
 		ArchiveThread                         func(childComplexity int, id objects.GUID) int
 		ArchiveTrace                          func(childComplexity int, id objects.GUID) int
 		Backup                                func(childComplexity int, input backup.BackupOptions) int
@@ -1056,6 +1057,7 @@ type ComplexityRoot struct {
 		CheckProviderQuotas                   func(childComplexity int) int
 		ClearCache                            func(childComplexity int, input ClearCacheInput) int
 		ClearChannelOverrideTemplates         func(childComplexity int, input ClearChannelOverrideTemplatesInput) int
+		CompareAndSetPluginKv                 func(childComplexity int, namespace *string, key string, expectedRevision *string, value string, ttlSeconds *int) int
 		CompleteAutoDisableChannelOnboarding  func(childComplexity int, input CompleteAutoDisableChannelOnboardingInput) int
 		CompleteOnboarding                    func(childComplexity int, input CompleteOnboardingInput) int
 		CompleteSystemModelSettingOnboarding  func(childComplexity int, input CompleteSystemModelSettingOnboardingInput) int
@@ -1096,6 +1098,8 @@ type ComplexityRoot struct {
 		InstallPluginFromMarket               func(childComplexity int, pluginID string, version string, grantedPermissions []string, grantedNetwork []string) int
 		LoadAPIKeyProfileTemplate             func(childComplexity int, input LoadAPIKeyProfileTemplateInput) int
 		PreviewPromptProtectionRule           func(childComplexity int, input PromptProtectionRulePreviewInput) int
+		ReleaseAPIKeySuspension               func(childComplexity int, id int, reason string) int
+		ReleasePluginKeySuspension            func(childComplexity int, id int) int
 		RemoveUserFromProject                 func(childComplexity int, input RemoveUserFromProjectInput) int
 		ResetChannelQuotaNow                  func(childComplexity int, channelID objects.GUID, resetID *string) int
 		ResetClaudeCodeSafeguardsSettings     func(childComplexity int) int
@@ -1106,6 +1110,7 @@ type ComplexityRoot struct {
 		SaveChannelEndpoints                  func(childComplexity int, input biz.SaveChannelEndpointsInput) int
 		SaveChannelModelPrices                func(childComplexity int, channelID objects.GUID, input []*biz.SaveChannelModelPriceInput) int
 		SaveProxyPreset                       func(childComplexity int, input biz.ProxyPreset) int
+		SetPluginAutomationScope              func(childComplexity int, id objects.GUID, scope objects.PluginAutomationScope) int
 		SetPluginKv                           func(childComplexity int, namespace *string, key string, value string, ttlSeconds *int) int
 		SyncChannelModels                     func(childComplexity int, channelID objects.GUID, pattern *string) int
 		TestChannel                           func(childComplexity int, input TestChannelInput) int
@@ -1252,23 +1257,66 @@ type ComplexityRoot struct {
 	}
 
 	Plugin struct {
-		Builtin             func(childComplexity int) int
-		Config              func(childComplexity int) int
-		ConfigFields        func(childComplexity int) int
-		Description         func(childComplexity int) int
-		Enabled             func(childComplexity int) int
-		GrantedNetwork      func(childComplexity int) int
-		GrantedPermissions  func(childComplexity int) int
-		ID                  func(childComplexity int) int
-		ManifestHooks       func(childComplexity int) int
-		ManifestNetwork     func(childComplexity int) int
-		ManifestPermissions func(childComplexity int) int
-		Name                func(childComplexity int) int
-		PluginID            func(childComplexity int) int
-		Priority            func(childComplexity int) int
-		RuntimeError        func(childComplexity int) int
-		RuntimeStatus       func(childComplexity int) int
-		Version             func(childComplexity int) int
+		AutomationScope      func(childComplexity int) int
+		Builtin              func(childComplexity int) int
+		Config               func(childComplexity int) int
+		ConfigFields         func(childComplexity int) int
+		Description          func(childComplexity int) int
+		Enabled              func(childComplexity int) int
+		GrantedNetwork       func(childComplexity int) int
+		GrantedPermissions   func(childComplexity int) int
+		ID                   func(childComplexity int) int
+		ManifestHooks        func(childComplexity int) int
+		ManifestNetwork      func(childComplexity int) int
+		ManifestPermissions  func(childComplexity int) int
+		ManifestSchedules    func(childComplexity int) int
+		Name                 func(childComplexity int) int
+		PluginID             func(childComplexity int) int
+		Priority             func(childComplexity int) int
+		RequiredCapabilities func(childComplexity int) int
+		RuntimeError         func(childComplexity int) int
+		RuntimeStatus        func(childComplexity int) int
+		Version              func(childComplexity int) int
+	}
+
+	PluginAutomationScope struct {
+		Projects func(childComplexity int) int
+	}
+
+	PluginCacheKeyUsage struct {
+		CacheRate         func(childComplexity int) int
+		CachedTokens      func(childComplexity int) int
+		Count             func(childComplexity int) int
+		EnoughSamples     func(childComplexity int) int
+		InvalidCount      func(childComplexity int) int
+		KeyID             func(childComplexity int) int
+		KeyName           func(childComplexity int) int
+		LatestRequestID   func(childComplexity int) int
+		LatestUsageID     func(childComplexity int) int
+		ProjectID         func(childComplexity int) int
+		PromptTokens      func(childComplexity int) int
+		SampleComplete    func(childComplexity int) int
+		Samples           func(childComplexity int) int
+		SamplesTruncated  func(childComplexity int) int
+		TrailingLowCount  func(childComplexity int) int
+		TrailingTruncated func(childComplexity int) int
+		UnknownCount      func(childComplexity int) int
+		ValidCount        func(childComplexity int) int
+	}
+
+	PluginCacheUsagePage struct {
+		End            func(childComplexity int) int
+		Items          func(childComplexity int) int
+		NextAfterKeyID func(childComplexity int) int
+	}
+
+	PluginCacheUsageSample struct {
+		CacheRate    func(childComplexity int) int
+		CachedTokens func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		PromptTokens func(childComplexity int) int
+		RequestID    func(childComplexity int) int
+		Status       func(childComplexity int) int
 	}
 
 	PluginConfigField struct {
@@ -1289,10 +1337,16 @@ type ComplexityRoot struct {
 		UpgradePreview func(childComplexity int) int
 	}
 
+	PluginKVCASResult struct {
+		Entry   func(childComplexity int) int
+		Swapped func(childComplexity int) int
+	}
+
 	PluginKVEntry struct {
 		ExpiresAt func(childComplexity int) int
 		Key       func(childComplexity int) int
 		Namespace func(childComplexity int) int
+		Revision  func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 		Value     func(childComplexity int) int
 	}
@@ -1300,6 +1354,23 @@ type ComplexityRoot struct {
 	PluginKVPage struct {
 		Entries    func(childComplexity int) int
 		NextCursor func(childComplexity int) int
+	}
+
+	PluginKeySuspension struct {
+		APIKeyID       func(childComplexity int) int
+		CreatedAt      func(childComplexity int) int
+		CreatedBy      func(childComplexity int) int
+		Evidence       func(childComplexity int) int
+		ExpiresAt      func(childComplexity int) int
+		ID             func(childComplexity int) int
+		InstallationID func(childComplexity int) int
+		PluginID       func(childComplexity int) int
+		ProjectID      func(childComplexity int) int
+		Reason         func(childComplexity int) int
+		ReleaseReason  func(childComplexity int) int
+		ReleasedAt     func(childComplexity int) int
+		ReleasedBy     func(childComplexity int) int
+		UpdatedAt      func(childComplexity int) int
 	}
 
 	PluginManifestAttemptHook struct {
@@ -1327,6 +1398,13 @@ type ComplexityRoot struct {
 		Version          func(childComplexity int) int
 	}
 
+	PluginProjectAccess struct {
+		APIKeyIDs         func(childComplexity int) int
+		AllKeys           func(childComplexity int) int
+		ExcludedAPIKeyIDs func(childComplexity int) int
+		ProjectID         func(childComplexity int) int
+	}
+
 	PluginRuntimeStatus struct {
 		ID                      func(childComplexity int) int
 		Overloaded              func(childComplexity int) int
@@ -1335,6 +1413,11 @@ type ComplexityRoot struct {
 		ProtectedDrops          func(childComplexity int) int
 		Reason                  func(childComplexity int) int
 		Status                  func(childComplexity int) int
+	}
+
+	PluginScheduleSpec struct {
+		IntervalSeconds func(childComplexity int) int
+		Key             func(childComplexity int) int
 	}
 
 	PluginUIAction struct {
@@ -1371,14 +1454,16 @@ type ComplexityRoot struct {
 	}
 
 	PluginUpgradePreview struct {
-		Actions        func(childComplexity int) int
-		CurrentVersion func(childComplexity int) int
-		Events         func(childComplexity int) int
-		Hooks          func(childComplexity int) int
-		Network        func(childComplexity int) int
-		NewVersion     func(childComplexity int) int
-		Pages          func(childComplexity int) int
-		Permissions    func(childComplexity int) int
+		Actions              func(childComplexity int) int
+		CurrentVersion       func(childComplexity int) int
+		Events               func(childComplexity int) int
+		Hooks                func(childComplexity int) int
+		Network              func(childComplexity int) int
+		NewVersion           func(childComplexity int) int
+		Pages                func(childComplexity int) int
+		Permissions          func(childComplexity int) int
+		RequiredCapabilities func(childComplexity int) int
+		Schedules            func(childComplexity int) int
 	}
 
 	PriceOverride struct {
@@ -1582,6 +1667,7 @@ type ComplexityRoot struct {
 	Query struct {
 		APIKeyProfileTemplates          func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.APIKeyProfileTemplateOrder, where *ent.APIKeyProfileTemplateWhereInput) int
 		APIKeyQuotaUsages               func(childComplexity int, apiKeyID objects.GUID) int
+		APIKeySuspensions               func(childComplexity int, filter objects.APIKeySuspensionFilter) int
 		APIKeyTokenUsageStats           func(childComplexity int, input *APIKeyTokenUsageStatsInput) int
 		APIKeys                         func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.APIKeyOrder, where *ent.APIKeyWhereInput) int
 		AllChannelSummarys              func(childComplexity int, includeArchived *bool) int
@@ -1625,8 +1711,11 @@ type ComplexityRoot struct {
 		OidcIdentities                  func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.OIDCIdentityOrder, where *ent.OIDCIdentityWhereInput) int
 		OnboardingInfo                  func(childComplexity int) int
 		PassThroughSettings             func(childComplexity int) int
+		PluginCacheUsage                func(childComplexity int, options plugin.CacheUsageOptions) int
 		PluginCountersArePerInstance    func(childComplexity int) int
+		PluginHostCapabilities          func(childComplexity int) int
 		PluginKVList                    func(childComplexity int, namespace *string, prefix *string, first *int, after *string) int
+		PluginKeySuspensions            func(childComplexity int, filter objects.APIKeySuspensionFilter) int
 		PluginKv                        func(childComplexity int, namespace *string, key string) int
 		PluginMarket                    func(childComplexity int) int
 		PluginRuntimeStatuses           func(childComplexity int) int
@@ -2596,8 +2685,13 @@ type MutationResolver interface {
 	UpdatePluginSettings(ctx context.Context, id objects.GUID, priority int, config map[string]any) (*plugin.InstalledPlugin, error)
 	DeletePlugin(ctx context.Context, id objects.GUID) (bool, error)
 	SetPluginKv(ctx context.Context, namespace *string, key string, value string, ttlSeconds *int) (*plugin.KVEntry, error)
+	CompareAndSetPluginKv(ctx context.Context, namespace *string, key string, expectedRevision *string, value string, ttlSeconds *int) (*plugin.KVCASResult, error)
 	DeletePluginKv(ctx context.Context, namespace *string, key string) (bool, error)
 	CreatePluginUISession(ctx context.Context, pluginID string, entry string) (*plugin.UISession, error)
+	SetPluginAutomationScope(ctx context.Context, id objects.GUID, scope objects.PluginAutomationScope) (*plugin.InstalledPlugin, error)
+	ReleaseAPIKeySuspension(ctx context.Context, id int, reason string) (*objects.APIKeySuspensionResult, error)
+	ReleasePluginKeySuspension(ctx context.Context, id int) (*objects.APIKeySuspensionResult, error)
+	ApplyPluginKeySuspension(ctx context.Context, input objects.APIKeySuspensionInput) (*objects.APIKeySuspensionResult, error)
 }
 type OIDCIdentityResolver interface {
 	ID(ctx context.Context, obj *ent.OIDCIdentity) (*objects.GUID, error)
@@ -2720,6 +2814,10 @@ type QueryResolver interface {
 	PluginKv(ctx context.Context, namespace *string, key string) (*plugin.KVEntry, error)
 	PluginKVList(ctx context.Context, namespace *string, prefix *string, first *int, after *string) (*plugin.KVPage, error)
 	PluginUIEntries(ctx context.Context) (*plugin.UIEntries, error)
+	PluginHostCapabilities(ctx context.Context) ([]string, error)
+	PluginCacheUsage(ctx context.Context, options plugin.CacheUsageOptions) (*biz.CacheUsagePage, error)
+	PluginKeySuspensions(ctx context.Context, filter objects.APIKeySuspensionFilter) ([]*objects.APIKeySuspensionResult, error)
+	APIKeySuspensions(ctx context.Context, filter objects.APIKeySuspensionFilter) ([]*objects.APIKeySuspensionResult, error)
 }
 type RequestResolver interface {
 	ID(ctx context.Context, obj *ent.Request) (*objects.GUID, error)
@@ -6262,6 +6360,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.ApplyChannelOverrideTemplate(childComplexity, args["input"].(ApplyChannelOverrideTemplateInput)), true
+	case "Mutation.applyPluginKeySuspension":
+		if e.complexity.Mutation.ApplyPluginKeySuspension == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_applyPluginKeySuspension_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ApplyPluginKeySuspension(childComplexity, args["input"].(objects.APIKeySuspensionInput)), true
 	case "Mutation.archiveThread":
 		if e.complexity.Mutation.ArchiveThread == nil {
 			break
@@ -6620,6 +6729,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.ClearChannelOverrideTemplates(childComplexity, args["input"].(ClearChannelOverrideTemplatesInput)), true
+	case "Mutation.compareAndSetPluginKV":
+		if e.complexity.Mutation.CompareAndSetPluginKv == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_compareAndSetPluginKV_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CompareAndSetPluginKv(childComplexity, args["namespace"].(*string), args["key"].(string), args["expectedRevision"].(*string), args["value"].(string), args["ttlSeconds"].(*int)), true
 	case "Mutation.completeAutoDisableChannelOnboarding":
 		if e.complexity.Mutation.CompleteAutoDisableChannelOnboarding == nil {
 			break
@@ -7060,6 +7180,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.PreviewPromptProtectionRule(childComplexity, args["input"].(PromptProtectionRulePreviewInput)), true
+	case "Mutation.releaseAPIKeySuspension":
+		if e.complexity.Mutation.ReleaseAPIKeySuspension == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_releaseAPIKeySuspension_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ReleaseAPIKeySuspension(childComplexity, args["id"].(int), args["reason"].(string)), true
+	case "Mutation.releasePluginKeySuspension":
+		if e.complexity.Mutation.ReleasePluginKeySuspension == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_releasePluginKeySuspension_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ReleasePluginKeySuspension(childComplexity, args["id"].(int)), true
 	case "Mutation.removeUserFromProject":
 		if e.complexity.Mutation.RemoveUserFromProject == nil {
 			break
@@ -7165,6 +7307,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SaveProxyPreset(childComplexity, args["input"].(biz.ProxyPreset)), true
+	case "Mutation.setPluginAutomationScope":
+		if e.complexity.Mutation.SetPluginAutomationScope == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setPluginAutomationScope_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetPluginAutomationScope(childComplexity, args["id"].(objects.GUID), args["scope"].(objects.PluginAutomationScope)), true
 	case "Mutation.setPluginKV":
 		if e.complexity.Mutation.SetPluginKv == nil {
 			break
@@ -8100,6 +8253,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PassThroughSettings.Enabled(childComplexity), true
 
+	case "Plugin.automationScope":
+		if e.complexity.Plugin.AutomationScope == nil {
+			break
+		}
+
+		return e.complexity.Plugin.AutomationScope(childComplexity), true
 	case "Plugin.builtin":
 		if e.complexity.Plugin.Builtin == nil {
 			break
@@ -8166,6 +8325,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Plugin.ManifestPermissions(childComplexity), true
+	case "Plugin.manifestSchedules":
+		if e.complexity.Plugin.ManifestSchedules == nil {
+			break
+		}
+
+		return e.complexity.Plugin.ManifestSchedules(childComplexity), true
 	case "Plugin.name":
 		if e.complexity.Plugin.Name == nil {
 			break
@@ -8184,6 +8349,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Plugin.Priority(childComplexity), true
+	case "Plugin.requiredCapabilities":
+		if e.complexity.Plugin.RequiredCapabilities == nil {
+			break
+		}
+
+		return e.complexity.Plugin.RequiredCapabilities(childComplexity), true
 	case "Plugin.runtimeError":
 		if e.complexity.Plugin.RuntimeError == nil {
 			break
@@ -8202,6 +8373,178 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Plugin.Version(childComplexity), true
+
+	case "PluginAutomationScope.projects":
+		if e.complexity.PluginAutomationScope.Projects == nil {
+			break
+		}
+
+		return e.complexity.PluginAutomationScope.Projects(childComplexity), true
+
+	case "PluginCacheKeyUsage.cacheRate":
+		if e.complexity.PluginCacheKeyUsage.CacheRate == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.CacheRate(childComplexity), true
+	case "PluginCacheKeyUsage.cachedTokens":
+		if e.complexity.PluginCacheKeyUsage.CachedTokens == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.CachedTokens(childComplexity), true
+	case "PluginCacheKeyUsage.count":
+		if e.complexity.PluginCacheKeyUsage.Count == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.Count(childComplexity), true
+	case "PluginCacheKeyUsage.enoughSamples":
+		if e.complexity.PluginCacheKeyUsage.EnoughSamples == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.EnoughSamples(childComplexity), true
+	case "PluginCacheKeyUsage.invalidCount":
+		if e.complexity.PluginCacheKeyUsage.InvalidCount == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.InvalidCount(childComplexity), true
+	case "PluginCacheKeyUsage.keyId":
+		if e.complexity.PluginCacheKeyUsage.KeyID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.KeyID(childComplexity), true
+	case "PluginCacheKeyUsage.keyName":
+		if e.complexity.PluginCacheKeyUsage.KeyName == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.KeyName(childComplexity), true
+	case "PluginCacheKeyUsage.latestRequestId":
+		if e.complexity.PluginCacheKeyUsage.LatestRequestID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.LatestRequestID(childComplexity), true
+	case "PluginCacheKeyUsage.latestUsageId":
+		if e.complexity.PluginCacheKeyUsage.LatestUsageID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.LatestUsageID(childComplexity), true
+	case "PluginCacheKeyUsage.projectId":
+		if e.complexity.PluginCacheKeyUsage.ProjectID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.ProjectID(childComplexity), true
+	case "PluginCacheKeyUsage.promptTokens":
+		if e.complexity.PluginCacheKeyUsage.PromptTokens == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.PromptTokens(childComplexity), true
+	case "PluginCacheKeyUsage.sampleComplete":
+		if e.complexity.PluginCacheKeyUsage.SampleComplete == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.SampleComplete(childComplexity), true
+	case "PluginCacheKeyUsage.samples":
+		if e.complexity.PluginCacheKeyUsage.Samples == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.Samples(childComplexity), true
+	case "PluginCacheKeyUsage.samplesTruncated":
+		if e.complexity.PluginCacheKeyUsage.SamplesTruncated == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.SamplesTruncated(childComplexity), true
+	case "PluginCacheKeyUsage.trailingLowCount":
+		if e.complexity.PluginCacheKeyUsage.TrailingLowCount == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.TrailingLowCount(childComplexity), true
+	case "PluginCacheKeyUsage.trailingTruncated":
+		if e.complexity.PluginCacheKeyUsage.TrailingTruncated == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.TrailingTruncated(childComplexity), true
+	case "PluginCacheKeyUsage.unknownCount":
+		if e.complexity.PluginCacheKeyUsage.UnknownCount == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.UnknownCount(childComplexity), true
+	case "PluginCacheKeyUsage.validCount":
+		if e.complexity.PluginCacheKeyUsage.ValidCount == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheKeyUsage.ValidCount(childComplexity), true
+
+	case "PluginCacheUsagePage.end":
+		if e.complexity.PluginCacheUsagePage.End == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsagePage.End(childComplexity), true
+	case "PluginCacheUsagePage.items":
+		if e.complexity.PluginCacheUsagePage.Items == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsagePage.Items(childComplexity), true
+	case "PluginCacheUsagePage.nextAfterKeyId":
+		if e.complexity.PluginCacheUsagePage.NextAfterKeyID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsagePage.NextAfterKeyID(childComplexity), true
+
+	case "PluginCacheUsageSample.cacheRate":
+		if e.complexity.PluginCacheUsageSample.CacheRate == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.CacheRate(childComplexity), true
+	case "PluginCacheUsageSample.cachedTokens":
+		if e.complexity.PluginCacheUsageSample.CachedTokens == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.CachedTokens(childComplexity), true
+	case "PluginCacheUsageSample.createdAt":
+		if e.complexity.PluginCacheUsageSample.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.CreatedAt(childComplexity), true
+	case "PluginCacheUsageSample.promptTokens":
+		if e.complexity.PluginCacheUsageSample.PromptTokens == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.PromptTokens(childComplexity), true
+	case "PluginCacheUsageSample.requestId":
+		if e.complexity.PluginCacheUsageSample.RequestID == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.RequestID(childComplexity), true
+	case "PluginCacheUsageSample.status":
+		if e.complexity.PluginCacheUsageSample.Status == nil {
+			break
+		}
+
+		return e.complexity.PluginCacheUsageSample.Status(childComplexity), true
 
 	case "PluginConfigField.defaultJSON":
 		if e.complexity.PluginConfigField.DefaultJSON == nil {
@@ -8277,6 +8620,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PluginInstallResult.UpgradePreview(childComplexity), true
 
+	case "PluginKVCASResult.entry":
+		if e.complexity.PluginKVCASResult.Entry == nil {
+			break
+		}
+
+		return e.complexity.PluginKVCASResult.Entry(childComplexity), true
+	case "PluginKVCASResult.swapped":
+		if e.complexity.PluginKVCASResult.Swapped == nil {
+			break
+		}
+
+		return e.complexity.PluginKVCASResult.Swapped(childComplexity), true
+
 	case "PluginKVEntry.expiresAt":
 		if e.complexity.PluginKVEntry.ExpiresAt == nil {
 			break
@@ -8295,6 +8651,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PluginKVEntry.Namespace(childComplexity), true
+	case "PluginKVEntry.revision":
+		if e.complexity.PluginKVEntry.Revision == nil {
+			break
+		}
+
+		return e.complexity.PluginKVEntry.Revision(childComplexity), true
 	case "PluginKVEntry.updatedAt":
 		if e.complexity.PluginKVEntry.UpdatedAt == nil {
 			break
@@ -8320,6 +8682,91 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PluginKVPage.NextCursor(childComplexity), true
+
+	case "PluginKeySuspension.apiKeyId":
+		if e.complexity.PluginKeySuspension.APIKeyID == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.APIKeyID(childComplexity), true
+	case "PluginKeySuspension.createdAt":
+		if e.complexity.PluginKeySuspension.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.CreatedAt(childComplexity), true
+	case "PluginKeySuspension.createdBy":
+		if e.complexity.PluginKeySuspension.CreatedBy == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.CreatedBy(childComplexity), true
+	case "PluginKeySuspension.evidence":
+		if e.complexity.PluginKeySuspension.Evidence == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.Evidence(childComplexity), true
+	case "PluginKeySuspension.expiresAt":
+		if e.complexity.PluginKeySuspension.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ExpiresAt(childComplexity), true
+	case "PluginKeySuspension.id":
+		if e.complexity.PluginKeySuspension.ID == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ID(childComplexity), true
+	case "PluginKeySuspension.installationId":
+		if e.complexity.PluginKeySuspension.InstallationID == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.InstallationID(childComplexity), true
+	case "PluginKeySuspension.pluginId":
+		if e.complexity.PluginKeySuspension.PluginID == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.PluginID(childComplexity), true
+	case "PluginKeySuspension.projectId":
+		if e.complexity.PluginKeySuspension.ProjectID == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ProjectID(childComplexity), true
+	case "PluginKeySuspension.reason":
+		if e.complexity.PluginKeySuspension.Reason == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.Reason(childComplexity), true
+	case "PluginKeySuspension.releaseReason":
+		if e.complexity.PluginKeySuspension.ReleaseReason == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ReleaseReason(childComplexity), true
+	case "PluginKeySuspension.releasedAt":
+		if e.complexity.PluginKeySuspension.ReleasedAt == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ReleasedAt(childComplexity), true
+	case "PluginKeySuspension.releasedBy":
+		if e.complexity.PluginKeySuspension.ReleasedBy == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.ReleasedBy(childComplexity), true
+	case "PluginKeySuspension.updatedAt":
+		if e.complexity.PluginKeySuspension.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.PluginKeySuspension.UpdatedAt(childComplexity), true
 
 	case "PluginManifestAttemptHook.apiFormats":
 		if e.complexity.PluginManifestAttemptHook.APIFormats == nil {
@@ -8403,6 +8850,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PluginMarketEntry.Version(childComplexity), true
 
+	case "PluginProjectAccess.apiKeyIds":
+		if e.complexity.PluginProjectAccess.APIKeyIDs == nil {
+			break
+		}
+
+		return e.complexity.PluginProjectAccess.APIKeyIDs(childComplexity), true
+	case "PluginProjectAccess.allKeys":
+		if e.complexity.PluginProjectAccess.AllKeys == nil {
+			break
+		}
+
+		return e.complexity.PluginProjectAccess.AllKeys(childComplexity), true
+	case "PluginProjectAccess.excludedApiKeyIds":
+		if e.complexity.PluginProjectAccess.ExcludedAPIKeyIDs == nil {
+			break
+		}
+
+		return e.complexity.PluginProjectAccess.ExcludedAPIKeyIDs(childComplexity), true
+	case "PluginProjectAccess.projectId":
+		if e.complexity.PluginProjectAccess.ProjectID == nil {
+			break
+		}
+
+		return e.complexity.PluginProjectAccess.ProjectID(childComplexity), true
+
 	case "PluginRuntimeStatus.id":
 		if e.complexity.PluginRuntimeStatus.ID == nil {
 			break
@@ -8445,6 +8917,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PluginRuntimeStatus.Status(childComplexity), true
+
+	case "PluginScheduleSpec.intervalSeconds":
+		if e.complexity.PluginScheduleSpec.IntervalSeconds == nil {
+			break
+		}
+
+		return e.complexity.PluginScheduleSpec.IntervalSeconds(childComplexity), true
+	case "PluginScheduleSpec.key":
+		if e.complexity.PluginScheduleSpec.Key == nil {
+			break
+		}
+
+		return e.complexity.PluginScheduleSpec.Key(childComplexity), true
 
 	case "PluginUIAction.effect":
 		if e.complexity.PluginUIAction.Effect == nil {
@@ -8607,6 +9092,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PluginUpgradePreview.Permissions(childComplexity), true
+	case "PluginUpgradePreview.requiredCapabilities":
+		if e.complexity.PluginUpgradePreview.RequiredCapabilities == nil {
+			break
+		}
+
+		return e.complexity.PluginUpgradePreview.RequiredCapabilities(childComplexity), true
+	case "PluginUpgradePreview.schedules":
+		if e.complexity.PluginUpgradePreview.Schedules == nil {
+			break
+		}
+
+		return e.complexity.PluginUpgradePreview.Schedules(childComplexity), true
 
 	case "PriceOverride.items":
 		if e.complexity.PriceOverride.Items == nil {
@@ -9387,6 +9884,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.APIKeyQuotaUsages(childComplexity, args["apiKeyId"].(objects.GUID)), true
+	case "Query.apiKeySuspensions":
+		if e.complexity.Query.APIKeySuspensions == nil {
+			break
+		}
+
+		args, err := ec.field_Query_apiKeySuspensions_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.APIKeySuspensions(childComplexity, args["filter"].(objects.APIKeySuspensionFilter)), true
 	case "Query.apiKeyTokenUsageStats":
 		if e.complexity.Query.APIKeyTokenUsageStats == nil {
 			break
@@ -9770,12 +10278,29 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.PassThroughSettings(childComplexity), true
+	case "Query.pluginCacheUsage":
+		if e.complexity.Query.PluginCacheUsage == nil {
+			break
+		}
+
+		args, err := ec.field_Query_pluginCacheUsage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PluginCacheUsage(childComplexity, args["options"].(plugin.CacheUsageOptions)), true
 	case "Query.pluginCountersArePerInstance":
 		if e.complexity.Query.PluginCountersArePerInstance == nil {
 			break
 		}
 
 		return e.complexity.Query.PluginCountersArePerInstance(childComplexity), true
+	case "Query.pluginHostCapabilities":
+		if e.complexity.Query.PluginHostCapabilities == nil {
+			break
+		}
+
+		return e.complexity.Query.PluginHostCapabilities(childComplexity), true
 	case "Query.pluginKVList":
 		if e.complexity.Query.PluginKVList == nil {
 			break
@@ -9787,6 +10312,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.PluginKVList(childComplexity, args["namespace"].(*string), args["prefix"].(*string), args["first"].(*int), args["after"].(*string)), true
+	case "Query.pluginKeySuspensions":
+		if e.complexity.Query.PluginKeySuspensions == nil {
+			break
+		}
+
+		args, err := ec.field_Query_pluginKeySuspensions_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PluginKeySuspensions(childComplexity, args["filter"].(objects.APIKeySuspensionFilter)), true
 	case "Query.pluginKV":
 		if e.complexity.Query.PluginKv == nil {
 			break
@@ -13121,6 +13657,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputOverrideMatchInput,
 		ec.unmarshalInputOverrideOperationInput,
 		ec.unmarshalInputOverrideWhenInput,
+		ec.unmarshalInputPluginAutomationScopeInput,
+		ec.unmarshalInputPluginCacheUsageOptions,
+		ec.unmarshalInputPluginKeySuspensionFilter,
+		ec.unmarshalInputPluginKeySuspensionInput,
+		ec.unmarshalInputPluginKeySuspensionNotificationInput,
+		ec.unmarshalInputPluginProjectAccessInput,
 		ec.unmarshalInputPriceOverrideInput,
 		ec.unmarshalInputPriceScheduleInput,
 		ec.unmarshalInputPriceTierInput,
@@ -13326,7 +13868,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "axonhub.graphql" "ent.graphql" "dashboard.graphql" "scopes.graphql" "me.graphql" "system.graphql" "filter.graphql" "model.graphql" "backup.graphql" "channel_probe.graphql" "prompt.graphql" "prompt_protection_rule.graphql" "price.graphql" "cost.graphql" "analytics.graphql" "plugin.graphql"
+//go:embed "axonhub.graphql" "ent.graphql" "dashboard.graphql" "scopes.graphql" "me.graphql" "system.graphql" "filter.graphql" "model.graphql" "backup.graphql" "channel_probe.graphql" "prompt.graphql" "prompt_protection_rule.graphql" "price.graphql" "cost.graphql" "analytics.graphql" "plugin.graphql" "plugin_automation.graphql"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -13354,6 +13896,7 @@ var sources = []*ast.Source{
 	{Name: "cost.graphql", Input: sourceData("cost.graphql"), BuiltIn: false},
 	{Name: "analytics.graphql", Input: sourceData("analytics.graphql"), BuiltIn: false},
 	{Name: "plugin.graphql", Input: sourceData("plugin.graphql"), BuiltIn: false},
+	{Name: "plugin_automation.graphql", Input: sourceData("plugin_automation.graphql"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
@@ -13592,6 +14135,17 @@ func (ec *executionContext) field_Mutation_applyChannelOverrideTemplate_args(ctx
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNApplyChannelOverrideTemplateInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋgqlᚐApplyChannelOverrideTemplateInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_applyPluginKeySuspension_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNPluginKeySuspensionInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionInput)
 	if err != nil {
 		return nil, err
 	}
@@ -13968,6 +14522,37 @@ func (ec *executionContext) field_Mutation_clearChannelOverrideTemplates_args(ct
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_compareAndSetPluginKV_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "namespace", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["namespace"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "key", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["key"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "expectedRevision", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["expectedRevision"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "value", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["value"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "ttlSeconds", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["ttlSeconds"] = arg4
 	return args, nil
 }
 
@@ -14486,6 +15071,33 @@ func (ec *executionContext) field_Mutation_previewPromptProtectionRule_args(ctx 
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_releaseAPIKeySuspension_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "reason", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["reason"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_releasePluginKeySuspension_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_removeUserFromProject_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -14597,6 +15209,22 @@ func (ec *executionContext) field_Mutation_saveProxyPreset_args(ctx context.Cont
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setPluginAutomationScope_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐGUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "scope", ec.unmarshalNPluginAutomationScopeInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginAutomationScope)
+	if err != nil {
+		return nil, err
+	}
+	args["scope"] = arg1
 	return args, nil
 }
 
@@ -15813,6 +16441,17 @@ func (ec *executionContext) field_Query_apiKeyQuotaUsages_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_apiKeySuspensions_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "filter", ec.unmarshalNPluginKeySuspensionFilter2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionFilter)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_apiKeyTokenUsageStats_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -16188,6 +16827,17 @@ func (ec *executionContext) field_Query_oidcIdentities_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_pluginCacheUsage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "options", ec.unmarshalNPluginCacheUsageOptions2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐCacheUsageOptions)
+	if err != nil {
+		return nil, err
+	}
+	args["options"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_pluginKVList_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -16227,6 +16877,17 @@ func (ec *executionContext) field_Query_pluginKV_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["key"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_pluginKeySuspensions_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "filter", ec.unmarshalNPluginKeySuspensionFilter2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionFilter)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
 	return args, nil
 }
 
@@ -42050,6 +42711,12 @@ func (ec *executionContext) fieldContext_Mutation_enablePlugin(ctx context.Conte
 				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
 			case "runtimeError":
 				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
 		},
@@ -42127,6 +42794,12 @@ func (ec *executionContext) fieldContext_Mutation_disablePlugin(ctx context.Cont
 				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
 			case "runtimeError":
 				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
 		},
@@ -42204,6 +42877,12 @@ func (ec *executionContext) fieldContext_Mutation_updatePluginSettings(ctx conte
 				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
 			case "runtimeError":
 				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
 		},
@@ -42298,6 +42977,8 @@ func (ec *executionContext) fieldContext_Mutation_setPluginKV(ctx context.Contex
 				return ec.fieldContext_PluginKVEntry_expiresAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_PluginKVEntry_updatedAt(ctx, field)
+			case "revision":
+				return ec.fieldContext_PluginKVEntry_revision(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PluginKVEntry", field.Name)
 		},
@@ -42310,6 +42991,53 @@ func (ec *executionContext) fieldContext_Mutation_setPluginKV(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_setPluginKV_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_compareAndSetPluginKV(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_compareAndSetPluginKV,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CompareAndSetPluginKv(ctx, fc.Args["namespace"].(*string), fc.Args["key"].(string), fc.Args["expectedRevision"].(*string), fc.Args["value"].(string), fc.Args["ttlSeconds"].(*int))
+		},
+		nil,
+		ec.marshalNPluginKVCASResult2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐKVCASResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_compareAndSetPluginKV(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "swapped":
+				return ec.fieldContext_PluginKVCASResult_swapped(ctx, field)
+			case "entry":
+				return ec.fieldContext_PluginKVCASResult_entry(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKVCASResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_compareAndSetPluginKV_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -42400,6 +43128,302 @@ func (ec *executionContext) fieldContext_Mutation_createPluginUISession(ctx cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createPluginUISession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setPluginAutomationScope(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_setPluginAutomationScope,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().SetPluginAutomationScope(ctx, fc.Args["id"].(objects.GUID), fc.Args["scope"].(objects.PluginAutomationScope))
+		},
+		nil,
+		ec.marshalNPlugin2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐInstalledPlugin,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setPluginAutomationScope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Plugin_id(ctx, field)
+			case "pluginID":
+				return ec.fieldContext_Plugin_pluginID(ctx, field)
+			case "name":
+				return ec.fieldContext_Plugin_name(ctx, field)
+			case "version":
+				return ec.fieldContext_Plugin_version(ctx, field)
+			case "description":
+				return ec.fieldContext_Plugin_description(ctx, field)
+			case "enabled":
+				return ec.fieldContext_Plugin_enabled(ctx, field)
+			case "priority":
+				return ec.fieldContext_Plugin_priority(ctx, field)
+			case "builtin":
+				return ec.fieldContext_Plugin_builtin(ctx, field)
+			case "grantedPermissions":
+				return ec.fieldContext_Plugin_grantedPermissions(ctx, field)
+			case "grantedNetwork":
+				return ec.fieldContext_Plugin_grantedNetwork(ctx, field)
+			case "manifestPermissions":
+				return ec.fieldContext_Plugin_manifestPermissions(ctx, field)
+			case "manifestNetwork":
+				return ec.fieldContext_Plugin_manifestNetwork(ctx, field)
+			case "manifestHooks":
+				return ec.fieldContext_Plugin_manifestHooks(ctx, field)
+			case "configFields":
+				return ec.fieldContext_Plugin_configFields(ctx, field)
+			case "config":
+				return ec.fieldContext_Plugin_config(ctx, field)
+			case "runtimeStatus":
+				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
+			case "runtimeError":
+				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setPluginAutomationScope_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_releaseAPIKeySuspension(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_releaseAPIKeySuspension,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().ReleaseAPIKeySuspension(ctx, fc.Args["id"].(int), fc.Args["reason"].(string))
+		},
+		nil,
+		ec.marshalNPluginKeySuspension2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_releaseAPIKeySuspension(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PluginKeySuspension_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginKeySuspension_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKeySuspension_updatedAt(ctx, field)
+			case "installationId":
+				return ec.fieldContext_PluginKeySuspension_installationId(ctx, field)
+			case "pluginId":
+				return ec.fieldContext_PluginKeySuspension_pluginId(ctx, field)
+			case "apiKeyId":
+				return ec.fieldContext_PluginKeySuspension_apiKeyId(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginKeySuspension_projectId(ctx, field)
+			case "reason":
+				return ec.fieldContext_PluginKeySuspension_reason(ctx, field)
+			case "evidence":
+				return ec.fieldContext_PluginKeySuspension_evidence(ctx, field)
+			case "createdBy":
+				return ec.fieldContext_PluginKeySuspension_createdBy(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKeySuspension_expiresAt(ctx, field)
+			case "releasedAt":
+				return ec.fieldContext_PluginKeySuspension_releasedAt(ctx, field)
+			case "releasedBy":
+				return ec.fieldContext_PluginKeySuspension_releasedBy(ctx, field)
+			case "releaseReason":
+				return ec.fieldContext_PluginKeySuspension_releaseReason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKeySuspension", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_releaseAPIKeySuspension_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_releasePluginKeySuspension(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_releasePluginKeySuspension,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().ReleasePluginKeySuspension(ctx, fc.Args["id"].(int))
+		},
+		nil,
+		ec.marshalNPluginKeySuspension2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_releasePluginKeySuspension(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PluginKeySuspension_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginKeySuspension_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKeySuspension_updatedAt(ctx, field)
+			case "installationId":
+				return ec.fieldContext_PluginKeySuspension_installationId(ctx, field)
+			case "pluginId":
+				return ec.fieldContext_PluginKeySuspension_pluginId(ctx, field)
+			case "apiKeyId":
+				return ec.fieldContext_PluginKeySuspension_apiKeyId(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginKeySuspension_projectId(ctx, field)
+			case "reason":
+				return ec.fieldContext_PluginKeySuspension_reason(ctx, field)
+			case "evidence":
+				return ec.fieldContext_PluginKeySuspension_evidence(ctx, field)
+			case "createdBy":
+				return ec.fieldContext_PluginKeySuspension_createdBy(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKeySuspension_expiresAt(ctx, field)
+			case "releasedAt":
+				return ec.fieldContext_PluginKeySuspension_releasedAt(ctx, field)
+			case "releasedBy":
+				return ec.fieldContext_PluginKeySuspension_releasedBy(ctx, field)
+			case "releaseReason":
+				return ec.fieldContext_PluginKeySuspension_releaseReason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKeySuspension", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_releasePluginKeySuspension_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_applyPluginKeySuspension(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_applyPluginKeySuspension,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().ApplyPluginKeySuspension(ctx, fc.Args["input"].(objects.APIKeySuspensionInput))
+		},
+		nil,
+		ec.marshalNPluginKeySuspension2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_applyPluginKeySuspension(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PluginKeySuspension_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginKeySuspension_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKeySuspension_updatedAt(ctx, field)
+			case "installationId":
+				return ec.fieldContext_PluginKeySuspension_installationId(ctx, field)
+			case "pluginId":
+				return ec.fieldContext_PluginKeySuspension_pluginId(ctx, field)
+			case "apiKeyId":
+				return ec.fieldContext_PluginKeySuspension_apiKeyId(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginKeySuspension_projectId(ctx, field)
+			case "reason":
+				return ec.fieldContext_PluginKeySuspension_reason(ctx, field)
+			case "evidence":
+				return ec.fieldContext_PluginKeySuspension_evidence(ctx, field)
+			case "createdBy":
+				return ec.fieldContext_PluginKeySuspension_createdBy(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKeySuspension_expiresAt(ctx, field)
+			case "releasedAt":
+				return ec.fieldContext_PluginKeySuspension_releasedAt(ctx, field)
+			case "releasedBy":
+				return ec.fieldContext_PluginKeySuspension_releasedBy(ctx, field)
+			case "releaseReason":
+				return ec.fieldContext_PluginKeySuspension_releaseReason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKeySuspension", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_applyPluginKeySuspension_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -44483,6 +45507,977 @@ func (ec *executionContext) fieldContext_Plugin_runtimeError(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Plugin_automationScope(ctx context.Context, field graphql.CollectedField, obj *plugin.InstalledPlugin) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Plugin_automationScope,
+		func(ctx context.Context) (any, error) {
+			return obj.AutomationScope, nil
+		},
+		nil,
+		ec.marshalNPluginAutomationScope2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginAutomationScope,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Plugin_automationScope(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Plugin",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "projects":
+				return ec.fieldContext_PluginAutomationScope_projects(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginAutomationScope", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Plugin_manifestSchedules(ctx context.Context, field graphql.CollectedField, obj *plugin.InstalledPlugin) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Plugin_manifestSchedules,
+		func(ctx context.Context) (any, error) {
+			return obj.ManifestSchedules, nil
+		},
+		nil,
+		ec.marshalNPluginScheduleSpec2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginScheduleSpecᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Plugin_manifestSchedules(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Plugin",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "key":
+				return ec.fieldContext_PluginScheduleSpec_key(ctx, field)
+			case "intervalSeconds":
+				return ec.fieldContext_PluginScheduleSpec_intervalSeconds(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginScheduleSpec", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Plugin_requiredCapabilities(ctx context.Context, field graphql.CollectedField, obj *plugin.InstalledPlugin) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Plugin_requiredCapabilities,
+		func(ctx context.Context) (any, error) {
+			return obj.RequiredCapabilities, nil
+		},
+		nil,
+		ec.marshalNString2ᚕstringᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Plugin_requiredCapabilities(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Plugin",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginAutomationScope_projects(ctx context.Context, field graphql.CollectedField, obj *objects.PluginAutomationScope) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginAutomationScope_projects,
+		func(ctx context.Context) (any, error) {
+			return obj.Projects, nil
+		},
+		nil,
+		ec.marshalNPluginProjectAccess2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccessᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginAutomationScope_projects(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginAutomationScope",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "projectId":
+				return ec.fieldContext_PluginProjectAccess_projectId(ctx, field)
+			case "allKeys":
+				return ec.fieldContext_PluginProjectAccess_allKeys(ctx, field)
+			case "apiKeyIds":
+				return ec.fieldContext_PluginProjectAccess_apiKeyIds(ctx, field)
+			case "excludedApiKeyIds":
+				return ec.fieldContext_PluginProjectAccess_excludedApiKeyIds(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginProjectAccess", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_keyId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_keyId,
+		func(ctx context.Context) (any, error) {
+			return obj.KeyID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_keyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_keyName(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_keyName,
+		func(ctx context.Context) (any, error) {
+			return obj.KeyName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_keyName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_projectId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_projectId,
+		func(ctx context.Context) (any, error) {
+			return obj.ProjectID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_projectId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_latestRequestId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_latestRequestId,
+		func(ctx context.Context) (any, error) {
+			return obj.LatestRequestID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_latestRequestId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_latestUsageId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_latestUsageId,
+		func(ctx context.Context) (any, error) {
+			return obj.LatestUsageID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_latestUsageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_count(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_count,
+		func(ctx context.Context) (any, error) {
+			return obj.Count, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_count(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_validCount(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_validCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ValidCount, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_validCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_unknownCount(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_unknownCount,
+		func(ctx context.Context) (any, error) {
+			return obj.UnknownCount, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_unknownCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_invalidCount(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_invalidCount,
+		func(ctx context.Context) (any, error) {
+			return obj.InvalidCount, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_invalidCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_promptTokens(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_promptTokens,
+		func(ctx context.Context) (any, error) {
+			return obj.PromptTokens, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_promptTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_cachedTokens(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_cachedTokens,
+		func(ctx context.Context) (any, error) {
+			return obj.CachedTokens, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_cachedTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_cacheRate(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_cacheRate,
+		func(ctx context.Context) (any, error) {
+			return obj.CacheRate, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_cacheRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_enoughSamples(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_enoughSamples,
+		func(ctx context.Context) (any, error) {
+			return obj.EnoughSamples, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_enoughSamples(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_sampleComplete(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_sampleComplete,
+		func(ctx context.Context) (any, error) {
+			return obj.SampleComplete, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_sampleComplete(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_trailingLowCount(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_trailingLowCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TrailingLowCount, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_trailingLowCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_trailingTruncated(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_trailingTruncated,
+		func(ctx context.Context) (any, error) {
+			return obj.TrailingTruncated, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_trailingTruncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_samples(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_samples,
+		func(ctx context.Context) (any, error) {
+			return obj.Samples, nil
+		},
+		nil,
+		ec.marshalNPluginCacheUsageSample2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsageSampleᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_samples(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "requestId":
+				return ec.fieldContext_PluginCacheUsageSample_requestId(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginCacheUsageSample_createdAt(ctx, field)
+			case "status":
+				return ec.fieldContext_PluginCacheUsageSample_status(ctx, field)
+			case "promptTokens":
+				return ec.fieldContext_PluginCacheUsageSample_promptTokens(ctx, field)
+			case "cachedTokens":
+				return ec.fieldContext_PluginCacheUsageSample_cachedTokens(ctx, field)
+			case "cacheRate":
+				return ec.fieldContext_PluginCacheUsageSample_cacheRate(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginCacheUsageSample", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheKeyUsage_samplesTruncated(ctx context.Context, field graphql.CollectedField, obj *biz.CacheKeyUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheKeyUsage_samplesTruncated,
+		func(ctx context.Context) (any, error) {
+			return obj.SamplesTruncated, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheKeyUsage_samplesTruncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheKeyUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsagePage_end(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsagePage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsagePage_end,
+		func(ctx context.Context) (any, error) {
+			return obj.End, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsagePage_end(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsagePage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsagePage_items(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsagePage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsagePage_items,
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		ec.marshalNPluginCacheKeyUsage2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheKeyUsageᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsagePage_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsagePage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "keyId":
+				return ec.fieldContext_PluginCacheKeyUsage_keyId(ctx, field)
+			case "keyName":
+				return ec.fieldContext_PluginCacheKeyUsage_keyName(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginCacheKeyUsage_projectId(ctx, field)
+			case "latestRequestId":
+				return ec.fieldContext_PluginCacheKeyUsage_latestRequestId(ctx, field)
+			case "latestUsageId":
+				return ec.fieldContext_PluginCacheKeyUsage_latestUsageId(ctx, field)
+			case "count":
+				return ec.fieldContext_PluginCacheKeyUsage_count(ctx, field)
+			case "validCount":
+				return ec.fieldContext_PluginCacheKeyUsage_validCount(ctx, field)
+			case "unknownCount":
+				return ec.fieldContext_PluginCacheKeyUsage_unknownCount(ctx, field)
+			case "invalidCount":
+				return ec.fieldContext_PluginCacheKeyUsage_invalidCount(ctx, field)
+			case "promptTokens":
+				return ec.fieldContext_PluginCacheKeyUsage_promptTokens(ctx, field)
+			case "cachedTokens":
+				return ec.fieldContext_PluginCacheKeyUsage_cachedTokens(ctx, field)
+			case "cacheRate":
+				return ec.fieldContext_PluginCacheKeyUsage_cacheRate(ctx, field)
+			case "enoughSamples":
+				return ec.fieldContext_PluginCacheKeyUsage_enoughSamples(ctx, field)
+			case "sampleComplete":
+				return ec.fieldContext_PluginCacheKeyUsage_sampleComplete(ctx, field)
+			case "trailingLowCount":
+				return ec.fieldContext_PluginCacheKeyUsage_trailingLowCount(ctx, field)
+			case "trailingTruncated":
+				return ec.fieldContext_PluginCacheKeyUsage_trailingTruncated(ctx, field)
+			case "samples":
+				return ec.fieldContext_PluginCacheKeyUsage_samples(ctx, field)
+			case "samplesTruncated":
+				return ec.fieldContext_PluginCacheKeyUsage_samplesTruncated(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginCacheKeyUsage", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsagePage_nextAfterKeyId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsagePage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsagePage_nextAfterKeyId,
+		func(ctx context.Context) (any, error) {
+			return obj.NextAfterKeyID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsagePage_nextAfterKeyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsagePage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_requestId(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_requestId,
+		func(ctx context.Context) (any, error) {
+			return obj.RequestID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_requestId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_createdAt(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_status(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CacheReadStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_promptTokens(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_promptTokens,
+		func(ctx context.Context) (any, error) {
+			return obj.PromptTokens, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_promptTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_cachedTokens(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_cachedTokens,
+		func(ctx context.Context) (any, error) {
+			return obj.CachedTokens, nil
+		},
+		nil,
+		ec.marshalNMetricCount2int64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_cachedTokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type MetricCount does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginCacheUsageSample_cacheRate(ctx context.Context, field graphql.CollectedField, obj *biz.CacheUsageSample) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginCacheUsageSample_cacheRate,
+		func(ctx context.Context) (any, error) {
+			return obj.CacheRate, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginCacheUsageSample_cacheRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginCacheUsageSample",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PluginConfigField_name(ctx context.Context, field graphql.CollectedField, obj *plugin.ConfigField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -44831,6 +46826,12 @@ func (ec *executionContext) fieldContext_PluginInstallResult_plugin(_ context.Co
 				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
 			case "runtimeError":
 				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
 		},
@@ -44878,8 +46879,84 @@ func (ec *executionContext) fieldContext_PluginInstallResult_upgradePreview(_ co
 				return ec.fieldContext_PluginUpgradePreview_pages(ctx, field)
 			case "actions":
 				return ec.fieldContext_PluginUpgradePreview_actions(ctx, field)
+			case "schedules":
+				return ec.fieldContext_PluginUpgradePreview_schedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_PluginUpgradePreview_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PluginUpgradePreview", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKVCASResult_swapped(ctx context.Context, field graphql.CollectedField, obj *plugin.KVCASResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKVCASResult_swapped,
+		func(ctx context.Context) (any, error) {
+			return obj.Swapped, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKVCASResult_swapped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKVCASResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKVCASResult_entry(ctx context.Context, field graphql.CollectedField, obj *plugin.KVCASResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKVCASResult_entry,
+		func(ctx context.Context) (any, error) {
+			return obj.Entry, nil
+		},
+		nil,
+		ec.marshalOPluginKVEntry2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐKVEntry,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKVCASResult_entry(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKVCASResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "namespace":
+				return ec.fieldContext_PluginKVEntry_namespace(ctx, field)
+			case "key":
+				return ec.fieldContext_PluginKVEntry_key(ctx, field)
+			case "value":
+				return ec.fieldContext_PluginKVEntry_value(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKVEntry_expiresAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKVEntry_updatedAt(ctx, field)
+			case "revision":
+				return ec.fieldContext_PluginKVEntry_revision(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKVEntry", field.Name)
 		},
 	}
 	return fc, nil
@@ -45030,6 +47107,35 @@ func (ec *executionContext) fieldContext_PluginKVEntry_updatedAt(_ context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _PluginKVEntry_revision(ctx context.Context, field graphql.CollectedField, obj *plugin.KVEntry) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKVEntry_revision,
+		func(ctx context.Context) (any, error) {
+			return obj.Revision, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKVEntry_revision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKVEntry",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PluginKVPage_entries(ctx context.Context, field graphql.CollectedField, obj *plugin.KVPage) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -45064,6 +47170,8 @@ func (ec *executionContext) fieldContext_PluginKVPage_entries(_ context.Context,
 				return ec.fieldContext_PluginKVEntry_expiresAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_PluginKVEntry_updatedAt(ctx, field)
+			case "revision":
+				return ec.fieldContext_PluginKVEntry_revision(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PluginKVEntry", field.Name)
 		},
@@ -45090,6 +47198,412 @@ func (ec *executionContext) _PluginKVPage_nextCursor(ctx context.Context, field 
 func (ec *executionContext) fieldContext_PluginKVPage_nextCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PluginKVPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_id(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_createdAt(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_updatedAt(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_installationId(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_installationId,
+		func(ctx context.Context) (any, error) {
+			return obj.InstallationID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_installationId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_pluginId(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_pluginId,
+		func(ctx context.Context) (any, error) {
+			return obj.PluginID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_pluginId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_apiKeyId(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_apiKeyId,
+		func(ctx context.Context) (any, error) {
+			return obj.APIKeyID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_apiKeyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_projectId(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_projectId,
+		func(ctx context.Context) (any, error) {
+			return obj.ProjectID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_projectId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_reason(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_reason,
+		func(ctx context.Context) (any, error) {
+			return obj.Reason, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_evidence(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_evidence,
+		func(ctx context.Context) (any, error) {
+			return obj.Evidence, nil
+		},
+		nil,
+		ec.marshalNMap2map,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_evidence(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Map does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_createdBy(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_createdBy,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedBy, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_createdBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_expiresAt(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_releasedAt(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_releasedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ReleasedAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_releasedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_releasedBy(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_releasedBy,
+		func(ctx context.Context) (any, error) {
+			return obj.ReleasedBy, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_releasedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginKeySuspension_releaseReason(ctx context.Context, field graphql.CollectedField, obj *objects.APIKeySuspensionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginKeySuspension_releaseReason,
+		func(ctx context.Context) (any, error) {
+			return obj.ReleaseReason, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginKeySuspension_releaseReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginKeySuspension",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -45489,6 +48003,122 @@ func (ec *executionContext) fieldContext_PluginMarketEntry_updateFrom(_ context.
 	return fc, nil
 }
 
+func (ec *executionContext) _PluginProjectAccess_projectId(ctx context.Context, field graphql.CollectedField, obj *objects.PluginProjectAccess) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginProjectAccess_projectId,
+		func(ctx context.Context) (any, error) {
+			return obj.ProjectID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginProjectAccess_projectId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginProjectAccess",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginProjectAccess_allKeys(ctx context.Context, field graphql.CollectedField, obj *objects.PluginProjectAccess) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginProjectAccess_allKeys,
+		func(ctx context.Context) (any, error) {
+			return obj.AllKeys, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginProjectAccess_allKeys(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginProjectAccess",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginProjectAccess_apiKeyIds(ctx context.Context, field graphql.CollectedField, obj *objects.PluginProjectAccess) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginProjectAccess_apiKeyIds,
+		func(ctx context.Context) (any, error) {
+			return obj.APIKeyIDs, nil
+		},
+		nil,
+		ec.marshalNInt2ᚕintᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginProjectAccess_apiKeyIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginProjectAccess",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginProjectAccess_excludedApiKeyIds(ctx context.Context, field graphql.CollectedField, obj *objects.PluginProjectAccess) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginProjectAccess_excludedApiKeyIds,
+		func(ctx context.Context) (any, error) {
+			return obj.ExcludedAPIKeyIDs, nil
+		},
+		nil,
+		ec.marshalNInt2ᚕintᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginProjectAccess_excludedApiKeyIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginProjectAccess",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PluginRuntimeStatus_id(ctx context.Context, field graphql.CollectedField, obj *plugin.RuntimeStatusView) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -45682,6 +48312,64 @@ func (ec *executionContext) _PluginRuntimeStatus_overriddenByPassThrough(ctx con
 func (ec *executionContext) fieldContext_PluginRuntimeStatus_overriddenByPassThrough(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PluginRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginScheduleSpec_key(ctx context.Context, field graphql.CollectedField, obj *objects.PluginScheduleSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginScheduleSpec_key,
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginScheduleSpec_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginScheduleSpec",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginScheduleSpec_intervalSeconds(ctx context.Context, field graphql.CollectedField, obj *objects.PluginScheduleSpec) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginScheduleSpec_intervalSeconds,
+		func(ctx context.Context) (any, error) {
+			return obj.IntervalSeconds, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginScheduleSpec_intervalSeconds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginScheduleSpec",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -46466,6 +49154,64 @@ func (ec *executionContext) _PluginUpgradePreview_actions(ctx context.Context, f
 }
 
 func (ec *executionContext) fieldContext_PluginUpgradePreview_actions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginUpgradePreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginUpgradePreview_schedules(ctx context.Context, field graphql.CollectedField, obj *plugin.UpgradePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginUpgradePreview_schedules,
+		func(ctx context.Context) (any, error) {
+			return obj.Schedules, nil
+		},
+		nil,
+		ec.marshalNString2ᚕstringᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginUpgradePreview_schedules(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PluginUpgradePreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PluginUpgradePreview_requiredCapabilities(ctx context.Context, field graphql.CollectedField, obj *plugin.UpgradePreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PluginUpgradePreview_requiredCapabilities,
+		func(ctx context.Context) (any, error) {
+			return obj.RequiredCapabilities, nil
+		},
+		nil,
+		ec.marshalNString2ᚕstringᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PluginUpgradePreview_requiredCapabilities(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PluginUpgradePreview",
 		Field:      field,
@@ -54393,6 +57139,12 @@ func (ec *executionContext) fieldContext_Query_plugins(_ context.Context, field 
 				return ec.fieldContext_Plugin_runtimeStatus(ctx, field)
 			case "runtimeError":
 				return ec.fieldContext_Plugin_runtimeError(ctx, field)
+			case "automationScope":
+				return ec.fieldContext_Plugin_automationScope(ctx, field)
+			case "manifestSchedules":
+				return ec.fieldContext_Plugin_manifestSchedules(ctx, field)
+			case "requiredCapabilities":
+				return ec.fieldContext_Plugin_requiredCapabilities(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Plugin", field.Name)
 		},
@@ -54554,6 +57306,8 @@ func (ec *executionContext) fieldContext_Query_pluginKV(ctx context.Context, fie
 				return ec.fieldContext_PluginKVEntry_expiresAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_PluginKVEntry_updatedAt(ctx, field)
+			case "revision":
+				return ec.fieldContext_PluginKVEntry_revision(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PluginKVEntry", field.Name)
 		},
@@ -54650,6 +57404,226 @@ func (ec *executionContext) fieldContext_Query_pluginUIEntries(_ context.Context
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PluginUIEntries", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_pluginHostCapabilities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_pluginHostCapabilities,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().PluginHostCapabilities(ctx)
+		},
+		nil,
+		ec.marshalNString2ᚕstringᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_pluginHostCapabilities(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_pluginCacheUsage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_pluginCacheUsage,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PluginCacheUsage(ctx, fc.Args["options"].(plugin.CacheUsageOptions))
+		},
+		nil,
+		ec.marshalNPluginCacheUsagePage2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsagePage,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_pluginCacheUsage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "end":
+				return ec.fieldContext_PluginCacheUsagePage_end(ctx, field)
+			case "items":
+				return ec.fieldContext_PluginCacheUsagePage_items(ctx, field)
+			case "nextAfterKeyId":
+				return ec.fieldContext_PluginCacheUsagePage_nextAfterKeyId(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginCacheUsagePage", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_pluginCacheUsage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_pluginKeySuspensions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_pluginKeySuspensions,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PluginKeySuspensions(ctx, fc.Args["filter"].(objects.APIKeySuspensionFilter))
+		},
+		nil,
+		ec.marshalNPluginKeySuspension2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResultᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_pluginKeySuspensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PluginKeySuspension_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginKeySuspension_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKeySuspension_updatedAt(ctx, field)
+			case "installationId":
+				return ec.fieldContext_PluginKeySuspension_installationId(ctx, field)
+			case "pluginId":
+				return ec.fieldContext_PluginKeySuspension_pluginId(ctx, field)
+			case "apiKeyId":
+				return ec.fieldContext_PluginKeySuspension_apiKeyId(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginKeySuspension_projectId(ctx, field)
+			case "reason":
+				return ec.fieldContext_PluginKeySuspension_reason(ctx, field)
+			case "evidence":
+				return ec.fieldContext_PluginKeySuspension_evidence(ctx, field)
+			case "createdBy":
+				return ec.fieldContext_PluginKeySuspension_createdBy(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKeySuspension_expiresAt(ctx, field)
+			case "releasedAt":
+				return ec.fieldContext_PluginKeySuspension_releasedAt(ctx, field)
+			case "releasedBy":
+				return ec.fieldContext_PluginKeySuspension_releasedBy(ctx, field)
+			case "releaseReason":
+				return ec.fieldContext_PluginKeySuspension_releaseReason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKeySuspension", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_pluginKeySuspensions_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_apiKeySuspensions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_apiKeySuspensions,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().APIKeySuspensions(ctx, fc.Args["filter"].(objects.APIKeySuspensionFilter))
+		},
+		nil,
+		ec.marshalNPluginKeySuspension2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResultᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_apiKeySuspensions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_PluginKeySuspension_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PluginKeySuspension_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_PluginKeySuspension_updatedAt(ctx, field)
+			case "installationId":
+				return ec.fieldContext_PluginKeySuspension_installationId(ctx, field)
+			case "pluginId":
+				return ec.fieldContext_PluginKeySuspension_pluginId(ctx, field)
+			case "apiKeyId":
+				return ec.fieldContext_PluginKeySuspension_apiKeyId(ctx, field)
+			case "projectId":
+				return ec.fieldContext_PluginKeySuspension_projectId(ctx, field)
+			case "reason":
+				return ec.fieldContext_PluginKeySuspension_reason(ctx, field)
+			case "evidence":
+				return ec.fieldContext_PluginKeySuspension_evidence(ctx, field)
+			case "createdBy":
+				return ec.fieldContext_PluginKeySuspension_createdBy(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PluginKeySuspension_expiresAt(ctx, field)
+			case "releasedAt":
+				return ec.fieldContext_PluginKeySuspension_releasedAt(ctx, field)
+			case "releasedBy":
+				return ec.fieldContext_PluginKeySuspension_releasedBy(ctx, field)
+			case "releaseReason":
+				return ec.fieldContext_PluginKeySuspension_releaseReason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PluginKeySuspension", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_apiKeySuspensions_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -82823,6 +85797,419 @@ func (ec *executionContext) unmarshalInputOverrideWhenInput(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputPluginAutomationScopeInput(ctx context.Context, obj any) (objects.PluginAutomationScope, error) {
+	var it objects.PluginAutomationScope
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"projects"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "projects":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projects"))
+			data, err := ec.unmarshalNPluginProjectAccessInput2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccessᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Projects = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPluginCacheUsageOptions(ctx context.Context, obj any) (plugin.CacheUsageOptions, error) {
+	var it plugin.CacheUsageOptions
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["allKeys"]; !present {
+		asMap["allKeys"] = false
+	}
+	if _, present := asMap["afterKeyId"]; !present {
+		asMap["afterKeyId"] = 0
+	}
+	if _, present := asMap["limit"]; !present {
+		asMap["limit"] = 100
+	}
+	if _, present := asMap["windowSeconds"]; !present {
+		asMap["windowSeconds"] = 0
+	}
+	if _, present := asMap["lastRequests"]; !present {
+		asMap["lastRequests"] = 0
+	}
+	if _, present := asMap["minSamples"]; !present {
+		asMap["minSamples"] = 0
+	}
+	if _, present := asMap["includeSamples"]; !present {
+		asMap["includeSamples"] = false
+	}
+
+	fieldsInOrder := [...]string{"projectId", "keyIds", "allKeys", "excludeKeyIds", "afterKeyId", "limit", "end", "windowSeconds", "lastRequests", "minSamples", "lowThreshold", "includeSamples", "modelIds", "channelIds"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "projectId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProjectID = data
+		case "keyIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("keyIds"))
+			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KeyIDs = data
+		case "allKeys":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allKeys"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AllKeys = data
+		case "excludeKeyIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excludeKeyIds"))
+			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExcludeKeyIDs = data
+		case "afterKeyId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("afterKeyId"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AfterKeyID = data
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "end":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
+			data, err := ec.unmarshalOTime2timeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.End = data
+		case "windowSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("windowSeconds"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WindowSeconds = data
+		case "lastRequests":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lastRequests"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LastRequests = data
+		case "minSamples":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minSamples"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinSamples = data
+		case "lowThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lowThreshold"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LowThreshold = data
+		case "includeSamples":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeSamples"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeSamples = data
+		case "modelIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("modelIds"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ModelIDs = data
+		case "channelIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("channelIds"))
+			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChannelIDs = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPluginKeySuspensionFilter(ctx context.Context, obj any) (objects.APIKeySuspensionFilter, error) {
+	var it objects.APIKeySuspensionFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["apiKeyId"]; !present {
+		asMap["apiKeyId"] = 0
+	}
+	if _, present := asMap["activeOnly"]; !present {
+		asMap["activeOnly"] = false
+	}
+	if _, present := asMap["limit"]; !present {
+		asMap["limit"] = 100
+	}
+	if _, present := asMap["beforeId"]; !present {
+		asMap["beforeId"] = 0
+	}
+
+	fieldsInOrder := [...]string{"projectId", "apiKeyId", "activeOnly", "limit", "beforeId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "projectId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProjectID = data
+		case "apiKeyId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("apiKeyId"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.APIKeyID = data
+		case "activeOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("activeOnly"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ActiveOnly = data
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "beforeId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("beforeId"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BeforeID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPluginKeySuspensionInput(ctx context.Context, obj any) (objects.APIKeySuspensionInput, error) {
+	var it objects.APIKeySuspensionInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["evidence"]; !present {
+		asMap["evidence"] = map[string]any{}
+	}
+	if _, present := asMap["durationSeconds"]; !present {
+		asMap["durationSeconds"] = 0
+	}
+	if _, present := asMap["permanent"]; !present {
+		asMap["permanent"] = false
+	}
+
+	fieldsInOrder := [...]string{"apiKeyId", "projectId", "idempotencyKey", "reason", "evidence", "durationSeconds", "permanent", "notification"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "apiKeyId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("apiKeyId"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.APIKeyID = data
+		case "projectId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProjectID = data
+		case "idempotencyKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("idempotencyKey"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IdempotencyKey = data
+		case "reason":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Reason = data
+		case "evidence":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("evidence"))
+			data, err := ec.unmarshalOMap2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Evidence = data
+		case "durationSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("durationSeconds"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DurationSeconds = data
+		case "permanent":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("permanent"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Permanent = data
+		case "notification":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notification"))
+			data, err := ec.unmarshalOPluginKeySuspensionNotificationInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginNotificationInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Notification = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPluginKeySuspensionNotificationInput(ctx context.Context, obj any) (objects.PluginNotificationInput, error) {
+	var it objects.PluginNotificationInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"targetName", "payload"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "targetName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("targetName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TargetName = data
+		case "payload":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("payload"))
+			data, err := ec.unmarshalNMap2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Payload = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPluginProjectAccessInput(ctx context.Context, obj any) (objects.PluginProjectAccess, error) {
+	var it objects.PluginProjectAccess
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["allKeys"]; !present {
+		asMap["allKeys"] = false
+	}
+	if _, present := asMap["apiKeyIds"]; !present {
+		asMap["apiKeyIds"] = []any{}
+	}
+	if _, present := asMap["excludedApiKeyIds"]; !present {
+		asMap["excludedApiKeyIds"] = []any{}
+	}
+
+	fieldsInOrder := [...]string{"projectId", "allKeys", "apiKeyIds", "excludedApiKeyIds"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "projectId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("projectId"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProjectID = data
+		case "allKeys":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allKeys"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AllKeys = data
+		case "apiKeyIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("apiKeyIds"))
+			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.APIKeyIDs = data
+		case "excludedApiKeyIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("excludedApiKeyIds"))
+			data, err := ec.unmarshalOInt2ᚕintᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExcludedAPIKeyIDs = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputPriceOverrideInput(ctx context.Context, obj any) (objects.PriceOverride, error) {
 	var it objects.PriceOverride
 	asMap := map[string]any{}
@@ -107636,6 +111023,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "compareAndSetPluginKV":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_compareAndSetPluginKV(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "deletePluginKV":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deletePluginKV(ctx, field)
@@ -107646,6 +111040,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "createPluginUISession":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createPluginUISession(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setPluginAutomationScope":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setPluginAutomationScope(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "releaseAPIKeySuspension":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_releaseAPIKeySuspension(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "releasePluginKeySuspension":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_releasePluginKeySuspension(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "applyPluginKeySuspension":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_applyPluginKeySuspension(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -108436,6 +111858,291 @@ func (ec *executionContext) _Plugin(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "automationScope":
+			out.Values[i] = ec._Plugin_automationScope(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "manifestSchedules":
+			out.Values[i] = ec._Plugin_manifestSchedules(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "requiredCapabilities":
+			out.Values[i] = ec._Plugin_requiredCapabilities(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginAutomationScopeImplementors = []string{"PluginAutomationScope"}
+
+func (ec *executionContext) _PluginAutomationScope(ctx context.Context, sel ast.SelectionSet, obj *objects.PluginAutomationScope) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginAutomationScopeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginAutomationScope")
+		case "projects":
+			out.Values[i] = ec._PluginAutomationScope_projects(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginCacheKeyUsageImplementors = []string{"PluginCacheKeyUsage"}
+
+func (ec *executionContext) _PluginCacheKeyUsage(ctx context.Context, sel ast.SelectionSet, obj *biz.CacheKeyUsage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginCacheKeyUsageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginCacheKeyUsage")
+		case "keyId":
+			out.Values[i] = ec._PluginCacheKeyUsage_keyId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "keyName":
+			out.Values[i] = ec._PluginCacheKeyUsage_keyName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "projectId":
+			out.Values[i] = ec._PluginCacheKeyUsage_projectId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latestRequestId":
+			out.Values[i] = ec._PluginCacheKeyUsage_latestRequestId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latestUsageId":
+			out.Values[i] = ec._PluginCacheKeyUsage_latestUsageId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "count":
+			out.Values[i] = ec._PluginCacheKeyUsage_count(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "validCount":
+			out.Values[i] = ec._PluginCacheKeyUsage_validCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unknownCount":
+			out.Values[i] = ec._PluginCacheKeyUsage_unknownCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "invalidCount":
+			out.Values[i] = ec._PluginCacheKeyUsage_invalidCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "promptTokens":
+			out.Values[i] = ec._PluginCacheKeyUsage_promptTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cachedTokens":
+			out.Values[i] = ec._PluginCacheKeyUsage_cachedTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cacheRate":
+			out.Values[i] = ec._PluginCacheKeyUsage_cacheRate(ctx, field, obj)
+		case "enoughSamples":
+			out.Values[i] = ec._PluginCacheKeyUsage_enoughSamples(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sampleComplete":
+			out.Values[i] = ec._PluginCacheKeyUsage_sampleComplete(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "trailingLowCount":
+			out.Values[i] = ec._PluginCacheKeyUsage_trailingLowCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "trailingTruncated":
+			out.Values[i] = ec._PluginCacheKeyUsage_trailingTruncated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "samples":
+			out.Values[i] = ec._PluginCacheKeyUsage_samples(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "samplesTruncated":
+			out.Values[i] = ec._PluginCacheKeyUsage_samplesTruncated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginCacheUsagePageImplementors = []string{"PluginCacheUsagePage"}
+
+func (ec *executionContext) _PluginCacheUsagePage(ctx context.Context, sel ast.SelectionSet, obj *biz.CacheUsagePage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginCacheUsagePageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginCacheUsagePage")
+		case "end":
+			out.Values[i] = ec._PluginCacheUsagePage_end(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "items":
+			out.Values[i] = ec._PluginCacheUsagePage_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "nextAfterKeyId":
+			out.Values[i] = ec._PluginCacheUsagePage_nextAfterKeyId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginCacheUsageSampleImplementors = []string{"PluginCacheUsageSample"}
+
+func (ec *executionContext) _PluginCacheUsageSample(ctx context.Context, sel ast.SelectionSet, obj *biz.CacheUsageSample) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginCacheUsageSampleImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginCacheUsageSample")
+		case "requestId":
+			out.Values[i] = ec._PluginCacheUsageSample_requestId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._PluginCacheUsageSample_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._PluginCacheUsageSample_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "promptTokens":
+			out.Values[i] = ec._PluginCacheUsageSample_promptTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cachedTokens":
+			out.Values[i] = ec._PluginCacheUsageSample_cachedTokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cacheRate":
+			out.Values[i] = ec._PluginCacheUsageSample_cacheRate(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -108575,6 +112282,47 @@ func (ec *executionContext) _PluginInstallResult(ctx context.Context, sel ast.Se
 	return out
 }
 
+var pluginKVCASResultImplementors = []string{"PluginKVCASResult"}
+
+func (ec *executionContext) _PluginKVCASResult(ctx context.Context, sel ast.SelectionSet, obj *plugin.KVCASResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginKVCASResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginKVCASResult")
+		case "swapped":
+			out.Values[i] = ec._PluginKVCASResult_swapped(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "entry":
+			out.Values[i] = ec._PluginKVCASResult_entry(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var pluginKVEntryImplementors = []string{"PluginKVEntry"}
 
 func (ec *executionContext) _PluginKVEntry(ctx context.Context, sel ast.SelectionSet, obj *plugin.KVEntry) graphql.Marshaler {
@@ -108605,6 +112353,11 @@ func (ec *executionContext) _PluginKVEntry(ctx context.Context, sel ast.Selectio
 			out.Values[i] = ec._PluginKVEntry_expiresAt(ctx, field, obj)
 		case "updatedAt":
 			out.Values[i] = ec._PluginKVEntry_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "revision":
+			out.Values[i] = ec._PluginKVEntry_revision(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -108649,6 +112402,104 @@ func (ec *executionContext) _PluginKVPage(ctx context.Context, sel ast.Selection
 			}
 		case "nextCursor":
 			out.Values[i] = ec._PluginKVPage_nextCursor(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginKeySuspensionImplementors = []string{"PluginKeySuspension"}
+
+func (ec *executionContext) _PluginKeySuspension(ctx context.Context, sel ast.SelectionSet, obj *objects.APIKeySuspensionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginKeySuspensionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginKeySuspension")
+		case "id":
+			out.Values[i] = ec._PluginKeySuspension_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._PluginKeySuspension_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._PluginKeySuspension_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "installationId":
+			out.Values[i] = ec._PluginKeySuspension_installationId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pluginId":
+			out.Values[i] = ec._PluginKeySuspension_pluginId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "apiKeyId":
+			out.Values[i] = ec._PluginKeySuspension_apiKeyId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "projectId":
+			out.Values[i] = ec._PluginKeySuspension_projectId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._PluginKeySuspension_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "evidence":
+			out.Values[i] = ec._PluginKeySuspension_evidence(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdBy":
+			out.Values[i] = ec._PluginKeySuspension_createdBy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._PluginKeySuspension_expiresAt(ctx, field, obj)
+		case "releasedAt":
+			out.Values[i] = ec._PluginKeySuspension_releasedAt(ctx, field, obj)
+		case "releasedBy":
+			out.Values[i] = ec._PluginKeySuspension_releasedBy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "releaseReason":
+			out.Values[i] = ec._PluginKeySuspension_releaseReason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -108861,6 +112712,60 @@ func (ec *executionContext) _PluginMarketEntry(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var pluginProjectAccessImplementors = []string{"PluginProjectAccess"}
+
+func (ec *executionContext) _PluginProjectAccess(ctx context.Context, sel ast.SelectionSet, obj *objects.PluginProjectAccess) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginProjectAccessImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginProjectAccess")
+		case "projectId":
+			out.Values[i] = ec._PluginProjectAccess_projectId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "allKeys":
+			out.Values[i] = ec._PluginProjectAccess_allKeys(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "apiKeyIds":
+			out.Values[i] = ec._PluginProjectAccess_apiKeyIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "excludedApiKeyIds":
+			out.Values[i] = ec._PluginProjectAccess_excludedApiKeyIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var pluginRuntimeStatusImplementors = []string{"PluginRuntimeStatus"}
 
 func (ec *executionContext) _PluginRuntimeStatus(ctx context.Context, sel ast.SelectionSet, obj *plugin.RuntimeStatusView) graphql.Marshaler {
@@ -108904,6 +112809,50 @@ func (ec *executionContext) _PluginRuntimeStatus(ctx context.Context, sel ast.Se
 			}
 		case "overriddenByPassThrough":
 			out.Values[i] = ec._PluginRuntimeStatus_overriddenByPassThrough(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pluginScheduleSpecImplementors = []string{"PluginScheduleSpec"}
+
+func (ec *executionContext) _PluginScheduleSpec(ctx context.Context, sel ast.SelectionSet, obj *objects.PluginScheduleSpec) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pluginScheduleSpecImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PluginScheduleSpec")
+		case "key":
+			out.Values[i] = ec._PluginScheduleSpec_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "intervalSeconds":
+			out.Values[i] = ec._PluginScheduleSpec_intervalSeconds(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -109238,6 +113187,16 @@ func (ec *executionContext) _PluginUpgradePreview(ctx context.Context, sel ast.S
 			}
 		case "actions":
 			out.Values[i] = ec._PluginUpgradePreview_actions(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "schedules":
+			out.Values[i] = ec._PluginUpgradePreview_schedules(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "requiredCapabilities":
+			out.Values[i] = ec._PluginUpgradePreview_requiredCapabilities(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -113342,6 +117301,94 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_pluginUIEntries(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "pluginHostCapabilities":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_pluginHostCapabilities(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "pluginCacheUsage":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_pluginCacheUsage(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "pluginKeySuspensions":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_pluginKeySuspensions(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "apiKeySuspensions":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_apiKeySuspensions(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -121833,6 +125880,34 @@ func (ec *executionContext) marshalNBulkUpdateChannelOrderingResult2ᚖgithubᚗ
 	return ec._BulkUpdateChannelOrderingResult(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus(ctx context.Context, v any) (llm.CacheReadStatus, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := unmarshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus[tmp]
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus(ctx context.Context, sel ast.SelectionSet, v llm.CacheReadStatus) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(marshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus[v])
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+var (
+	unmarshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus = map[string]llm.CacheReadStatus{
+		"unknown":  llm.CacheReadUnknown,
+		"reported": llm.CacheReadReported,
+	}
+	marshalNCacheReadStatus2githubᚗcomᚋloopljᚋaxonhubᚋllmᚐCacheReadStatus = map[llm.CacheReadStatus]string{
+		llm.CacheReadUnknown:  "unknown",
+		llm.CacheReadReported: "reported",
+	}
+)
+
 func (ec *executionContext) marshalNCatalogSettings2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCatalogSettings(ctx context.Context, sel ast.SelectionSet, v biz.CatalogSettings) graphql.Marshaler {
 	return ec._CatalogSettings(ctx, sel, &v)
 }
@@ -123891,6 +127966,36 @@ func (ec *executionContext) marshalNInt2int64(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v any) ([]int, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]int, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalNJSONRawMessage2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐJSONRawMessage(ctx context.Context, v any) (objects.JSONRawMessage, error) {
 	var res objects.JSONRawMessage
 	err := res.UnmarshalGQL(v)
@@ -123942,6 +128047,22 @@ func (ec *executionContext) marshalNMap2map(ctx context.Context, sel ast.Selecti
 	}
 	_ = sel
 	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNMetricCount2int64(ctx context.Context, v any) (int64, error) {
+	res, err := graphql.UnmarshalInt64(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNMetricCount2int64(ctx context.Context, sel ast.SelectionSet, v int64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalInt64(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -124829,6 +128950,130 @@ func (ec *executionContext) marshalNPlugin2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋ
 	return ec._Plugin(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPluginAutomationScope2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginAutomationScope(ctx context.Context, sel ast.SelectionSet, v objects.PluginAutomationScope) graphql.Marshaler {
+	return ec._PluginAutomationScope(ctx, sel, &v)
+}
+
+func (ec *executionContext) unmarshalNPluginAutomationScopeInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginAutomationScope(ctx context.Context, v any) (objects.PluginAutomationScope, error) {
+	res, err := ec.unmarshalInputPluginAutomationScopeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPluginCacheKeyUsage2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheKeyUsage(ctx context.Context, sel ast.SelectionSet, v biz.CacheKeyUsage) graphql.Marshaler {
+	return ec._PluginCacheKeyUsage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginCacheKeyUsage2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheKeyUsageᚄ(ctx context.Context, sel ast.SelectionSet, v []biz.CacheKeyUsage) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPluginCacheKeyUsage2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheKeyUsage(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalNPluginCacheUsageOptions2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐCacheUsageOptions(ctx context.Context, v any) (plugin.CacheUsageOptions, error) {
+	res, err := ec.unmarshalInputPluginCacheUsageOptions(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPluginCacheUsagePage2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsagePage(ctx context.Context, sel ast.SelectionSet, v biz.CacheUsagePage) graphql.Marshaler {
+	return ec._PluginCacheUsagePage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginCacheUsagePage2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsagePage(ctx context.Context, sel ast.SelectionSet, v *biz.CacheUsagePage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PluginCacheUsagePage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPluginCacheUsageSample2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsageSample(ctx context.Context, sel ast.SelectionSet, v biz.CacheUsageSample) graphql.Marshaler {
+	return ec._PluginCacheUsageSample(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginCacheUsageSample2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsageSampleᚄ(ctx context.Context, sel ast.SelectionSet, v []biz.CacheUsageSample) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPluginCacheUsageSample2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐCacheUsageSample(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalNPluginConfigField2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐConfigField(ctx context.Context, sel ast.SelectionSet, v plugin.ConfigField) graphql.Marshaler {
 	return ec._PluginConfigField(ctx, sel, &v)
 }
@@ -124889,6 +129134,20 @@ func (ec *executionContext) marshalNPluginInstallResult2ᚖgithubᚗcomᚋlooplj
 		return graphql.Null
 	}
 	return ec._PluginInstallResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPluginKVCASResult2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐKVCASResult(ctx context.Context, sel ast.SelectionSet, v plugin.KVCASResult) graphql.Marshaler {
+	return ec._PluginKVCASResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginKVCASResult2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐKVCASResult(ctx context.Context, sel ast.SelectionSet, v *plugin.KVCASResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PluginKVCASResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPluginKVEntry2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐKVEntry(ctx context.Context, sel ast.SelectionSet, v plugin.KVEntry) graphql.Marshaler {
@@ -124963,6 +129222,74 @@ func (ec *executionContext) marshalNPluginKVPage2ᚖgithubᚗcomᚋloopljᚋaxon
 	return ec._PluginKVPage(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPluginKeySuspension2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult(ctx context.Context, sel ast.SelectionSet, v objects.APIKeySuspensionResult) graphql.Marshaler {
+	return ec._PluginKeySuspension(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginKeySuspension2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResultᚄ(ctx context.Context, sel ast.SelectionSet, v []*objects.APIKeySuspensionResult) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPluginKeySuspension2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPluginKeySuspension2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionResult(ctx context.Context, sel ast.SelectionSet, v *objects.APIKeySuspensionResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PluginKeySuspension(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPluginKeySuspensionFilter2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionFilter(ctx context.Context, v any) (objects.APIKeySuspensionFilter, error) {
+	res, err := ec.unmarshalInputPluginKeySuspensionFilter(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNPluginKeySuspensionInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐAPIKeySuspensionInput(ctx context.Context, v any) (objects.APIKeySuspensionInput, error) {
+	res, err := ec.unmarshalInputPluginKeySuspensionInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNPluginManifestHooks2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐManifestHooks(ctx context.Context, sel ast.SelectionSet, v plugin.ManifestHooks) graphql.Marshaler {
 	return ec._PluginManifestHooks(ctx, sel, &v)
 }
@@ -125021,6 +129348,74 @@ func (ec *executionContext) marshalNPluginMarketEntry2ᚖgithubᚗcomᚋlooplj�
 	return ec._PluginMarketEntry(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPluginProjectAccess2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccess(ctx context.Context, sel ast.SelectionSet, v objects.PluginProjectAccess) graphql.Marshaler {
+	return ec._PluginProjectAccess(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginProjectAccess2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccessᚄ(ctx context.Context, sel ast.SelectionSet, v []objects.PluginProjectAccess) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPluginProjectAccess2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccess(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalNPluginProjectAccessInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccess(ctx context.Context, v any) (objects.PluginProjectAccess, error) {
+	res, err := ec.unmarshalInputPluginProjectAccessInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNPluginProjectAccessInput2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccessᚄ(ctx context.Context, v any) ([]objects.PluginProjectAccess, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]objects.PluginProjectAccess, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNPluginProjectAccessInput2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginProjectAccess(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 func (ec *executionContext) marshalNPluginRuntimeStatus2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐRuntimeStatusViewᚄ(ctx context.Context, sel ast.SelectionSet, v []*plugin.RuntimeStatusView) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -125073,6 +129468,54 @@ func (ec *executionContext) marshalNPluginRuntimeStatus2ᚖgithubᚗcomᚋlooplj
 		return graphql.Null
 	}
 	return ec._PluginRuntimeStatus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPluginScheduleSpec2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginScheduleSpec(ctx context.Context, sel ast.SelectionSet, v objects.PluginScheduleSpec) graphql.Marshaler {
+	return ec._PluginScheduleSpec(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPluginScheduleSpec2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginScheduleSpecᚄ(ctx context.Context, sel ast.SelectionSet, v []objects.PluginScheduleSpec) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPluginScheduleSpec2githubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginScheduleSpec(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNPluginUIAction2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐUIActionᚄ(ctx context.Context, sel ast.SelectionSet, v []*plugin.UIAction) graphql.Marshaler {
@@ -131069,6 +135512,24 @@ func (ec *executionContext) marshalOJSONRawMessageInput2ᚕgithubᚗcomᚋlooplj
 	return ret
 }
 
+func (ec *executionContext) unmarshalOMap2map(ctx context.Context, v any) (map[string]any, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMap2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalMap(v)
+	return res
+}
+
 func (ec *executionContext) marshalOModel2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋentᚐModel(ctx context.Context, sel ast.SelectionSet, v *ent.Model) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -131757,6 +136218,14 @@ func (ec *executionContext) marshalOPluginKVEntry2ᚖgithubᚗcomᚋloopljᚋaxo
 		return graphql.Null
 	}
 	return ec._PluginKVEntry(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOPluginKeySuspensionNotificationInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐPluginNotificationInput(ctx context.Context, v any) (*objects.PluginNotificationInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputPluginKeySuspensionNotificationInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOPluginManifestAttemptHook2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋpluginᚐManifestAttemptHook(ctx context.Context, sel ast.SelectionSet, v *plugin.ManifestAttemptHook) graphql.Marshaler {

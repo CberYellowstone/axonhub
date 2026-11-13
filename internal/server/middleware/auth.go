@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -49,10 +50,15 @@ func withAPIKeyConfig(auth *biz.AuthService, config *APIKeyConfig, allowNoAuth b
 		if err == nil {
 			apiKey, err = auth.AuthenticateAPIKey(c.Request.Context(), key)
 		}
-		if err != nil && allowNoAuth {
+		// An explicitly supplied key must never fall back to anonymous access:
+		// doing so would bypass suspension, manual disablement, and gate failures.
+		if err != nil && allowNoAuth && key == "" {
 			apiKey, err = auth.AuthenticateNoAuth(c.Request.Context())
 		}
 		if err != nil {
+			if abortAPIKeyGateError(c, err) {
+				return
+			}
 			if ent.IsNotFound(err) || errors.Is(err, biz.ErrInvalidAPIKey) {
 				AbortWithError(c, http.StatusUnauthorized, errors.New("Invalid API key"))
 			} else {
@@ -148,6 +154,9 @@ func WithOpenAPIAuth(auth *biz.AuthService) gin.HandlerFunc {
 
 		apiKey, err := auth.AuthenticateAPIKey(c.Request.Context(), key)
 		if err != nil {
+			if abortAPIKeyGateError(c, err) {
+				return
+			}
 			if ent.IsNotFound(err) || errors.Is(err, biz.ErrInvalidAPIKey) {
 				AbortWithError(c, http.StatusUnauthorized, errors.New("Invalid API key"))
 			} else {
@@ -231,6 +240,9 @@ func WithAdminGraphqlAuth(auth *biz.AuthService) gin.HandlerFunc {
 
 		apiKey, keyErr := auth.AuthenticateAPIKey(c.Request.Context(), token)
 		if keyErr != nil {
+			if abortAPIKeyGateError(c, keyErr) {
+				return
+			}
 			if ent.IsNotFound(keyErr) || errors.Is(keyErr, biz.ErrInvalidAPIKey) {
 				AbortWithError(c, http.StatusUnauthorized, errors.New("Invalid token"))
 			} else {
@@ -288,6 +300,9 @@ func WithGeminiKeyAuth(auth *biz.AuthService) gin.HandlerFunc {
 
 		apiKey, err := auth.AuthenticateAPIKey(c.Request.Context(), key)
 		if err != nil {
+			if abortAPIKeyGateError(c, err) {
+				return
+			}
 			if ent.IsNotFound(err) || errors.Is(err, biz.ErrInvalidAPIKey) {
 				AbortWithError(c, http.StatusUnauthorized, biz.ErrInvalidAPIKey)
 			} else {
@@ -324,6 +339,26 @@ func WithGeminiKeyAuth(auth *biz.AuthService) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// Suspension responses never expose plugin reasons/evidence or credentials.
+// Availability failures fail closed without misreporting a valid key as invalid.
+func abortAPIKeyGateError(c *gin.Context, err error) bool {
+	var suspended *biz.APIKeySuspendedError
+	if errors.As(err, &suspended) {
+		status := http.StatusForbidden
+		if suspended.Until != nil {
+			status = http.StatusTooManyRequests
+			c.Header("Retry-After", strconv.Itoa(suspended.RetryAfter(time.Now())))
+		}
+		AbortWithError(c, status, errors.New("API key is suspended"))
+		return true
+	}
+	if errors.Is(err, biz.ErrAPIKeyGateUnavailable) {
+		AbortWithError(c, http.StatusServiceUnavailable, errors.New("API key authorization temporarily unavailable"))
+		return true
+	}
+	return false
 }
 
 // WithSource 中间件用于设置请求来源到 context 中.

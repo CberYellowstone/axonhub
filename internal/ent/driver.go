@@ -18,3 +18,10 @@ func (c *Client) Driver() dialect.Driver {
 		return drv
 	}
 }
+
+// IsTransactional reports whether this client uses an Ent transaction driver,
+// including a driver wrapped by Debug. It does not open a transaction.
+func (c *Client) IsTransactional() bool {
+	_, ok := c.Driver().(*txDriver)
+	return ok
+}

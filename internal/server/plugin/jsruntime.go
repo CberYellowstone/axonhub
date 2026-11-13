@@ -1,3 +1,11 @@
+// 职责: 编译插件模块并校验 manifest 所需的命名导出。
+// 关联文件:
+//
+//	internal/server/plugin/manifest.go
+//	internal/server/plugin/scheduler.go
+//	internal/server/plugin/invoke.go
+//
+// 注意事项: onSchedule 与事件/请求钩子一样必须使用显式命名函数导出。
 package plugin
 
 import (
@@ -65,6 +73,9 @@ func requiredExports(manifest *objects.PluginManifest) []string {
 	required := make([]string, 0, 3)
 	if len(manifest.Events) > 0 {
 		required = append(required, "onEvent")
+	}
+	if len(manifest.Schedules) > 0 {
+		required = append(required, "onSchedule")
 	}
 	if manifest.Hooks != nil && manifest.Hooks.Request.IsEnabled() {
 		required = append(required, "onRequest")

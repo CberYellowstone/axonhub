@@ -734,6 +734,16 @@ func ConfigNotNil() predicate.Plugin {
 	return predicate.Plugin(sql.FieldNotNull(FieldConfig))
 }
 
+// AutomationScopeIsNil applies the IsNil predicate on the "automation_scope" field.
+func AutomationScopeIsNil() predicate.Plugin {
+	return predicate.Plugin(sql.FieldIsNull(FieldAutomationScope))
+}
+
+// AutomationScopeNotNil applies the NotNil predicate on the "automation_scope" field.
+func AutomationScopeNotNil() predicate.Plugin {
+	return predicate.Plugin(sql.FieldNotNull(FieldAutomationScope))
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Plugin) predicate.Plugin {
 	return predicate.Plugin(sql.AndPredicates(predicates...))

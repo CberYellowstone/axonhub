@@ -108,9 +108,13 @@ func publishRequestCompleted(ctx context.Context, state *PersistenceState, usage
 	publishEvent(ctx, eventBus(state), events.TypeRequestCompleted, events.SeverityInfo, func() (events.Subject, map[string]any) {
 		promptTokens := int64(0)
 		completionTokens := int64(0)
+		cachedTokens := int64(0)
 		if usage != nil {
 			promptTokens = usage.PromptTokens
 			completionTokens = usage.CompletionTokens
+			if usage.PromptTokensDetails != nil {
+				cachedTokens = usage.PromptTokensDetails.CachedTokens
+			}
 		}
 		latency := requestLatencyMs(state)
 		if metrics != nil && metrics.LatencyMs != nil {
@@ -121,6 +125,8 @@ func publishRequestCompleted(ctx context.Context, state *PersistenceState, usage
 			"latencyMs":        latency,
 			"promptTokens":     promptTokens,
 			"completionTokens": completionTokens,
+			"cachedTokens":     cachedTokens,
+			"cacheReadStatus":  string(usage.CacheReadReporting()),
 			"attempts":         outboundAttempts(state),
 			"stream":           stream,
 		}

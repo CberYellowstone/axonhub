@@ -45,6 +45,8 @@ const (
 	FieldGrantedNetwork = "granted_network"
 	// FieldConfig holds the string denoting the config field in the database.
 	FieldConfig = "config"
+	// FieldAutomationScope holds the string denoting the automation_scope field in the database.
+	FieldAutomationScope = "automation_scope"
 	// Table holds the table name of the plugin in the database.
 	Table = "plugins"
 )
@@ -67,6 +69,7 @@ var Columns = []string{
 	FieldGrantedPermissions,
 	FieldGrantedNetwork,
 	FieldConfig,
+	FieldAutomationScope,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -126,6 +129,8 @@ var (
 	DefaultGrantedNetwork []string
 	// DefaultConfig holds the default value on creation for the "config" field.
 	DefaultConfig map[string]interface{}
+	// DefaultAutomationScope holds the default value on creation for the "automation_scope" field.
+	DefaultAutomationScope objects.PluginAutomationScope
 )
 
 // OrderOption defines the ordering options for the Plugin queries.

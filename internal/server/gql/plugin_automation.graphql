@@ -1,0 +1,146 @@
+"""Owner-approved background automation ceiling. Empty projects denies access."""
+type PluginAutomationScope {
+  projects: [PluginProjectAccess!]!
+}
+
+type PluginProjectAccess {
+  projectId: Int!
+  allKeys: Boolean!
+  apiKeyIds: [Int!]!
+  excludedApiKeyIds: [Int!]!
+}
+
+input PluginAutomationScopeInput {
+  projects: [PluginProjectAccessInput!]!
+}
+
+input PluginProjectAccessInput {
+  projectId: Int!
+  allKeys: Boolean! = false
+  apiKeyIds: [Int!] = []
+  excludedApiKeyIds: [Int!] = []
+}
+
+extend type Mutation {
+  """Replace the entire scope. Requires a direct system Owner."""
+  setPluginAutomationScope(id: ID!, scope: PluginAutomationScopeInput!): Plugin!
+  """Release a suspension as a direct administrator, including after uninstall."""
+  releaseAPIKeySuspension(id: Int!, reason: String!): PluginKeySuspension!
+  releasePluginKeySuspension(id: Int!): PluginKeySuspension!
+  applyPluginKeySuspension(input: PluginKeySuspensionInput!): PluginKeySuspension!
+}
+
+type PluginScheduleSpec {
+  key: String!
+  intervalSeconds: Int!
+}
+
+"""An exact signed 64-bit metric count; clients must preserve integer precision."""
+scalar MetricCount
+
+enum CacheReadStatus {
+  unknown
+  reported
+}
+
+input PluginCacheUsageOptions {
+  projectId: Int!
+  keyIds: [Int!]
+  allKeys: Boolean = false
+  excludeKeyIds: [Int!]
+  afterKeyId: Int = 0
+  limit: Int = 100
+  end: Time
+  windowSeconds: Int = 0
+  lastRequests: Int = 0
+  minSamples: Int = 0
+  lowThreshold: Float
+  includeSamples: Boolean = false
+  modelIds: [String!]
+  channelIds: [Int!]
+}
+
+type PluginCacheUsagePage {
+  end: Time!
+  items: [PluginCacheKeyUsage!]!
+  nextAfterKeyId: Int!
+}
+
+type PluginCacheKeyUsage {
+  keyId: Int!
+  keyName: String!
+  projectId: Int!
+  latestRequestId: Int!
+  latestUsageId: Int!
+  count: MetricCount!
+  validCount: MetricCount!
+  unknownCount: MetricCount!
+  invalidCount: MetricCount!
+  promptTokens: MetricCount!
+  cachedTokens: MetricCount!
+  cacheRate: Float
+  enoughSamples: Boolean!
+  sampleComplete: Boolean!
+  trailingLowCount: MetricCount!
+  trailingTruncated: Boolean!
+  samples: [PluginCacheUsageSample!]!
+  samplesTruncated: Boolean!
+}
+
+type PluginCacheUsageSample {
+  requestId: Int!
+  createdAt: Time!
+  status: CacheReadStatus!
+  promptTokens: MetricCount!
+  cachedTokens: MetricCount!
+  cacheRate: Float
+}
+
+input PluginKeySuspensionInput {
+  apiKeyId: Int!
+  projectId: Int!
+  idempotencyKey: String!
+  reason: String!
+  evidence: Map = {}
+  durationSeconds: Int = 0
+  permanent: Boolean = false
+  notification: PluginKeySuspensionNotificationInput
+}
+
+"""Optional notification committed with its suspension. The host owns correlation and idempotency."""
+input PluginKeySuspensionNotificationInput {
+  targetName: String!
+  payload: Map!
+}
+
+input PluginKeySuspensionFilter {
+  projectId: Int!
+  apiKeyId: Int = 0
+  activeOnly: Boolean = false
+  limit: Int = 100
+  beforeId: Int = 0
+}
+
+type PluginKeySuspension {
+  id: Int!
+  createdAt: Time!
+  updatedAt: Time!
+  installationId: Int!
+  pluginId: String!
+  apiKeyId: Int!
+  projectId: Int!
+  reason: String!
+  evidence: Map!
+  createdBy: String!
+  expiresAt: Time
+  releasedAt: Time
+  releasedBy: String!
+  releaseReason: String!
+}
+
+extend type Query {
+  pluginHostCapabilities: [String!]!
+  pluginCacheUsage(options: PluginCacheUsageOptions!): PluginCacheUsagePage!
+  pluginKeySuspensions(filter: PluginKeySuspensionFilter!): [PluginKeySuspension!]!
+  apiKeySuspensions(filter: PluginKeySuspensionFilter!): [PluginKeySuspension!]!
+}

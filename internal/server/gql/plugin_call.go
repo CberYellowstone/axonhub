@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/looplj/axonhub/internal/authz"
 	"github.com/looplj/axonhub/internal/contexts"
+	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/pkg/xerrors"
 	"github.com/looplj/axonhub/internal/scopes"
 	"github.com/looplj/axonhub/internal/server/plugin"
@@ -55,9 +57,15 @@ func (h *pluginGraphqlHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 	granted := append([]string(nil), row.GrantedPermissions...)
 	call := plugin.Call{
-		ManifestID:     row.PluginID,
-		InstallationID: row.ID,
-		KVWritable:     scopes.HasSystemScope(user, scopes.ScopeWritePlugins),
+		ManifestID:         row.PluginID,
+		InstallationID:     row.ID,
+		KVWritable:         scopes.HasSystemScope(user, scopes.ScopeWritePlugins),
+		AutomationWritable: scopes.IsDirectOwner(r.Context()),
+	}
+	// KV can contain the rule configuration consumed by privileged background
+	// code. Users who manage ordinary plugin data cannot change those rules.
+	if slices.Contains(row.GrantedPermissions, objects.PluginPermissionKeySuspensions) {
+		call.KVWritable = call.KVWritable && scopes.IsDirectOwner(r.Context())
 	}
 	ctx, err := authz.DelegatePlugin(r.Context(), row.ID, pluginCallCeiling(granted))
 	if err != nil {

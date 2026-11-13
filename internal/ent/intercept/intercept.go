@@ -10,6 +10,7 @@ import (
 	"github.com/looplj/axonhub/internal/ent"
 	"github.com/looplj/axonhub/internal/ent/apikey"
 	"github.com/looplj/axonhub/internal/ent/apikeyprofiletemplate"
+	"github.com/looplj/axonhub/internal/ent/apikeysuspension"
 	"github.com/looplj/axonhub/internal/ent/channel"
 	"github.com/looplj/axonhub/internal/ent/channelmodelprice"
 	"github.com/looplj/axonhub/internal/ent/channelmodelpriceversion"
@@ -20,6 +21,8 @@ import (
 	"github.com/looplj/axonhub/internal/ent/model"
 	"github.com/looplj/axonhub/internal/ent/oidcidentity"
 	"github.com/looplj/axonhub/internal/ent/plugin"
+	"github.com/looplj/axonhub/internal/ent/pluginnotification"
+	"github.com/looplj/axonhub/internal/ent/pluginschedule"
 	"github.com/looplj/axonhub/internal/ent/pluginstorage"
 	"github.com/looplj/axonhub/internal/ent/predicate"
 	"github.com/looplj/axonhub/internal/ent/project"
@@ -146,6 +149,33 @@ func (f TraverseAPIKeyProfileTemplate) Traverse(ctx context.Context, q ent.Query
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.APIKeyProfileTemplateQuery", q)
+}
+
+// The APIKeySuspensionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type APIKeySuspensionFunc func(context.Context, *ent.APIKeySuspensionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f APIKeySuspensionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.APIKeySuspensionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.APIKeySuspensionQuery", q)
+}
+
+// The TraverseAPIKeySuspension type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAPIKeySuspension func(context.Context, *ent.APIKeySuspensionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAPIKeySuspension) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAPIKeySuspension) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.APIKeySuspensionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.APIKeySuspensionQuery", q)
 }
 
 // The ChannelFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -416,6 +446,60 @@ func (f TraversePlugin) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PluginQuery", q)
+}
+
+// The PluginNotificationFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PluginNotificationFunc func(context.Context, *ent.PluginNotificationQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PluginNotificationFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PluginNotificationQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PluginNotificationQuery", q)
+}
+
+// The TraversePluginNotification type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePluginNotification func(context.Context, *ent.PluginNotificationQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePluginNotification) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePluginNotification) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PluginNotificationQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PluginNotificationQuery", q)
+}
+
+// The PluginScheduleFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PluginScheduleFunc func(context.Context, *ent.PluginScheduleQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PluginScheduleFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PluginScheduleQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PluginScheduleQuery", q)
+}
+
+// The TraversePluginSchedule type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePluginSchedule func(context.Context, *ent.PluginScheduleQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePluginSchedule) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePluginSchedule) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PluginScheduleQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PluginScheduleQuery", q)
 }
 
 // The PluginStorageFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -830,6 +914,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.APIKeyQuery, predicate.APIKey, apikey.OrderOption]{typ: ent.TypeAPIKey, tq: q}, nil
 	case *ent.APIKeyProfileTemplateQuery:
 		return &query[*ent.APIKeyProfileTemplateQuery, predicate.APIKeyProfileTemplate, apikeyprofiletemplate.OrderOption]{typ: ent.TypeAPIKeyProfileTemplate, tq: q}, nil
+	case *ent.APIKeySuspensionQuery:
+		return &query[*ent.APIKeySuspensionQuery, predicate.APIKeySuspension, apikeysuspension.OrderOption]{typ: ent.TypeAPIKeySuspension, tq: q}, nil
 	case *ent.ChannelQuery:
 		return &query[*ent.ChannelQuery, predicate.Channel, channel.OrderOption]{typ: ent.TypeChannel, tq: q}, nil
 	case *ent.ChannelModelPriceQuery:
@@ -850,6 +936,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.OIDCIdentityQuery, predicate.OIDCIdentity, oidcidentity.OrderOption]{typ: ent.TypeOIDCIdentity, tq: q}, nil
 	case *ent.PluginQuery:
 		return &query[*ent.PluginQuery, predicate.Plugin, plugin.OrderOption]{typ: ent.TypePlugin, tq: q}, nil
+	case *ent.PluginNotificationQuery:
+		return &query[*ent.PluginNotificationQuery, predicate.PluginNotification, pluginnotification.OrderOption]{typ: ent.TypePluginNotification, tq: q}, nil
+	case *ent.PluginScheduleQuery:
+		return &query[*ent.PluginScheduleQuery, predicate.PluginSchedule, pluginschedule.OrderOption]{typ: ent.TypePluginSchedule, tq: q}, nil
 	case *ent.PluginStorageQuery:
 		return &query[*ent.PluginStorageQuery, predicate.PluginStorage, pluginstorage.OrderOption]{typ: ent.TypePluginStorage, tq: q}, nil
 	case *ent.ProjectQuery:

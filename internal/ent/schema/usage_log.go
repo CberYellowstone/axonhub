@@ -37,6 +37,11 @@ func (UsageLog) Indexes() []ent.Index {
 			StorageKey("usage_logs_by_channel_id_created_at"),
 		index.Fields("api_key_id", "created_at").
 			StorageKey("usage_logs_by_api_key_id_created_at"),
+		// Final-log dedup probes one project/request before time and ID. Without
+		// this equality prefix SQLite may scan the project's entire time range
+		// for every outer sample. Key/time scans use the existing api_key index.
+		index.Fields("project_id", "request_id", "created_at", "id").
+			StorageKey("usage_logs_by_project_request_recent"),
 	}
 }
 
@@ -56,6 +61,10 @@ func (UsageLog) Fields() []ent.Field {
 		// Prompt tokens details from llm.PromptTokensDetails
 		field.Int64("prompt_audio_tokens").Default(0).Optional().Comment("Number of audio tokens in the prompt"),
 		field.Int64("prompt_cached_tokens").Default(0).Optional().Comment("Number of cached tokens in the prompt"),
+		// Existing rows must remain unknown: zero does not prove upstream reported caching.
+		field.String("cache_read_status").MaxLen(16).Default("unknown").
+			Annotations(entgql.Skip()).
+			Comment("Explicit upstream cache-read reporting status: reported or unknown"),
 		field.Int64("prompt_write_cached_tokens").Default(0).Optional().Comment("Number of total write cache tokens, if 5m or 1h ttl variant is present, the field is the sum of 5m and 1h"),
 		field.Int64("prompt_write_cached_tokens_5m").Default(0).Optional().Comment("Number of token write cache with 5m ttl"),
 		field.Int64("prompt_write_cached_tokens_1h").Default(0).Optional().Comment("Number of token write cache with 1h ttl"),

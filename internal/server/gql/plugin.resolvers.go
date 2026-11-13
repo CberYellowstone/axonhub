@@ -121,6 +121,9 @@ func (r *mutationResolver) UpdatePluginSettings(ctx context.Context, id objects.
 	if err != nil {
 		return nil, err
 	}
+	if err := manager.RequireSettingsAuthority(ctx, rowID); err != nil {
+		return nil, err
+	}
 	if err := manager.UpdateSettings(ctx, rowID, priority, config); err != nil {
 		return nil, err
 	}
@@ -160,6 +163,22 @@ func (r *mutationResolver) SetPluginKv(ctx context.Context, namespace *string, k
 		return nil, err
 	}
 	return manager.KVSet(ctx, call.ManifestID, call.InstallationID, lo.FromPtr(namespace), key, value, pluginKVTTL(ttlSeconds))
+}
+
+// CompareAndSetPluginKv is the resolver for the compareAndSetPluginKV field.
+func (r *mutationResolver) CompareAndSetPluginKv(ctx context.Context, namespace *string, key string, expectedRevision *string, value string, ttlSeconds *int) (*plugin.KVCASResult, error) {
+	call, err := pluginCallFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := requirePluginKVWritable(call); err != nil {
+		return nil, err
+	}
+	manager, err := r.pluginManagerOrErr()
+	if err != nil {
+		return nil, err
+	}
+	return manager.KVCompareAndSet(ctx, call.ManifestID, call.InstallationID, lo.FromPtr(namespace), key, expectedRevision, value, pluginKVTTL(ttlSeconds))
 }
 
 // DeletePluginKv is the resolver for the deletePluginKV field.

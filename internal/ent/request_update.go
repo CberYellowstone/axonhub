@@ -556,6 +556,9 @@ func (_u *RequestUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(request.FieldStatus, field.TypeEnum, value)
 	}
+	if _u.mutation.CompletedAtCleared() {
+		_spec.ClearField(request.FieldCompletedAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.MetricsLatencyMs(); ok {
 		_spec.SetField(request.FieldMetricsLatencyMs, field.TypeInt64, value)
 	}
@@ -1299,6 +1302,9 @@ func (_u *RequestUpdateOne) sqlSave(ctx context.Context) (_node *Request, err er
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(request.FieldStatus, field.TypeEnum, value)
+	}
+	if _u.mutation.CompletedAtCleared() {
+		_spec.ClearField(request.FieldCompletedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.MetricsLatencyMs(); ok {
 		_spec.SetField(request.FieldMetricsLatencyMs, field.TypeInt64, value)

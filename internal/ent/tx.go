@@ -16,6 +16,8 @@ type Tx struct {
 	APIKey *APIKeyClient
 	// APIKeyProfileTemplate is the client for interacting with the APIKeyProfileTemplate builders.
 	APIKeyProfileTemplate *APIKeyProfileTemplateClient
+	// APIKeySuspension is the client for interacting with the APIKeySuspension builders.
+	APIKeySuspension *APIKeySuspensionClient
 	// Channel is the client for interacting with the Channel builders.
 	Channel *ChannelClient
 	// ChannelModelPrice is the client for interacting with the ChannelModelPrice builders.
@@ -36,6 +38,10 @@ type Tx struct {
 	OIDCIdentity *OIDCIdentityClient
 	// Plugin is the client for interacting with the Plugin builders.
 	Plugin *PluginClient
+	// PluginNotification is the client for interacting with the PluginNotification builders.
+	PluginNotification *PluginNotificationClient
+	// PluginSchedule is the client for interacting with the PluginSchedule builders.
+	PluginSchedule *PluginScheduleClient
 	// PluginStorage is the client for interacting with the PluginStorage builders.
 	PluginStorage *PluginStorageClient
 	// Project is the client for interacting with the Project builders.
@@ -199,6 +205,7 @@ func (tx *Tx) Client() *Client {
 func (tx *Tx) init() {
 	tx.APIKey = NewAPIKeyClient(tx.config)
 	tx.APIKeyProfileTemplate = NewAPIKeyProfileTemplateClient(tx.config)
+	tx.APIKeySuspension = NewAPIKeySuspensionClient(tx.config)
 	tx.Channel = NewChannelClient(tx.config)
 	tx.ChannelModelPrice = NewChannelModelPriceClient(tx.config)
 	tx.ChannelModelPriceVersion = NewChannelModelPriceVersionClient(tx.config)
@@ -209,6 +216,8 @@ func (tx *Tx) init() {
 	tx.Model = NewModelClient(tx.config)
 	tx.OIDCIdentity = NewOIDCIdentityClient(tx.config)
 	tx.Plugin = NewPluginClient(tx.config)
+	tx.PluginNotification = NewPluginNotificationClient(tx.config)
+	tx.PluginSchedule = NewPluginScheduleClient(tx.config)
 	tx.PluginStorage = NewPluginStorageClient(tx.config)
 	tx.Project = NewProjectClient(tx.config)
 	tx.Prompt = NewPromptClient(tx.config)

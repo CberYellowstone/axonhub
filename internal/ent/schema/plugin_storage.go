@@ -52,6 +52,10 @@ func (PluginStorage) Fields() []ent.Field {
 				dialect.MySQL: "mediumtext",
 			}).
 			Comment("UTF-8 value, at most 256 KiB. Empty string is valid. MySQL uses mediumtext."),
+		field.String("revision").
+			MaxLen(36).
+			Default("").
+			Comment("Opaque CAS token. Empty identifies a legacy row; every new write replaces it."),
 		field.Time("expires_at").
 			Optional().
 			Nillable().

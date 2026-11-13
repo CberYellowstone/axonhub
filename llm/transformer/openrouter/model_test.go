@@ -68,6 +68,7 @@ func TestResponse_ToOpenAIResponse(t *testing.T) {
 					},
 				},
 				Usage: &llm.Usage{
+					CacheReadStatus:  llm.CacheReadReported,
 					PromptTokens:     7,
 					CompletionTokens: 1290,
 					TotalTokens:      1297,
@@ -105,6 +106,7 @@ func TestResponse_ToOpenAIResponse(t *testing.T) {
 					},
 				},
 				Usage: &llm.Usage{
+					CacheReadStatus:  llm.CacheReadReported,
 					PromptTokens:     15604,
 					CompletionTokens: 71,
 					TotalTokens:      15675,
@@ -143,6 +145,7 @@ func TestResponse_ToOpenAIResponse(t *testing.T) {
 					},
 				},
 				Usage: &llm.Usage{
+					CacheReadStatus:  llm.CacheReadReported,
 					PromptTokens:     18810,
 					CompletionTokens: 68,
 					TotalTokens:      18878,

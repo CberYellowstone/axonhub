@@ -77,6 +77,20 @@ func (_u *PluginStorageUpdate) SetNillableValue(v *string) *PluginStorageUpdate 
 	return _u
 }
 
+// SetRevision sets the "revision" field.
+func (_u *PluginStorageUpdate) SetRevision(v string) *PluginStorageUpdate {
+	_u.mutation.SetRevision(v)
+	return _u
+}
+
+// SetNillableRevision sets the "revision" field if the given value is not nil.
+func (_u *PluginStorageUpdate) SetNillableRevision(v *string) *PluginStorageUpdate {
+	if v != nil {
+		_u.SetRevision(*v)
+	}
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *PluginStorageUpdate) SetExpiresAt(v time.Time) *PluginStorageUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -156,6 +170,11 @@ func (_u *PluginStorageUpdate) check() error {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "PluginStorage.key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Revision(); ok {
+		if err := pluginstorage.RevisionValidator(v); err != nil {
+			return &ValidationError{Name: "revision", err: fmt.Errorf(`ent: validator failed for field "PluginStorage.revision": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -188,6 +207,9 @@ func (_u *PluginStorageUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if value, ok := _u.mutation.Value(); ok {
 		_spec.SetField(pluginstorage.FieldValue, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Revision(); ok {
+		_spec.SetField(pluginstorage.FieldRevision, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(pluginstorage.FieldExpiresAt, field.TypeTime, value)
@@ -261,6 +283,20 @@ func (_u *PluginStorageUpdateOne) SetValue(v string) *PluginStorageUpdateOne {
 func (_u *PluginStorageUpdateOne) SetNillableValue(v *string) *PluginStorageUpdateOne {
 	if v != nil {
 		_u.SetValue(*v)
+	}
+	return _u
+}
+
+// SetRevision sets the "revision" field.
+func (_u *PluginStorageUpdateOne) SetRevision(v string) *PluginStorageUpdateOne {
+	_u.mutation.SetRevision(v)
+	return _u
+}
+
+// SetNillableRevision sets the "revision" field if the given value is not nil.
+func (_u *PluginStorageUpdateOne) SetNillableRevision(v *string) *PluginStorageUpdateOne {
+	if v != nil {
+		_u.SetRevision(*v)
 	}
 	return _u
 }
@@ -357,6 +393,11 @@ func (_u *PluginStorageUpdateOne) check() error {
 			return &ValidationError{Name: "key", err: fmt.Errorf(`ent: validator failed for field "PluginStorage.key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Revision(); ok {
+		if err := pluginstorage.RevisionValidator(v); err != nil {
+			return &ValidationError{Name: "revision", err: fmt.Errorf(`ent: validator failed for field "PluginStorage.revision": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -406,6 +447,9 @@ func (_u *PluginStorageUpdateOne) sqlSave(ctx context.Context) (_node *PluginSto
 	}
 	if value, ok := _u.mutation.Value(); ok {
 		_spec.SetField(pluginstorage.FieldValue, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Revision(); ok {
+		_spec.SetField(pluginstorage.FieldRevision, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(pluginstorage.FieldExpiresAt, field.TypeTime, value)

@@ -4,17 +4,21 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 
 	"github.com/looplj/axonhub/internal/authz"
 	"github.com/looplj/axonhub/internal/authz/identity"
 	"github.com/looplj/axonhub/internal/contexts"
 	"github.com/looplj/axonhub/internal/ent"
+	entplugin "github.com/looplj/axonhub/internal/ent/plugin"
 	"github.com/looplj/axonhub/internal/ent/pluginstorage"
 	"github.com/looplj/axonhub/internal/ent/predicate"
+	"github.com/looplj/axonhub/internal/objects"
 )
 
 const (
@@ -29,11 +33,12 @@ var kvNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,128}$`)
 
 // KVEntry is one stored value. ExpiresAt is nil when the row does not expire.
 type KVEntry struct {
-	Namespace string
-	Key       string
-	Value     string
-	ExpiresAt *time.Time
-	UpdatedAt time.Time
+	Namespace string     `json:"namespace"`
+	Key       string     `json:"key"`
+	Value     string     `json:"value"`
+	ExpiresAt *time.Time `json:"expiresAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+	Revision  string     `json:"revision"`
 }
 
 // KVGet returns the row for this installation. A missing or expired row is
@@ -87,11 +92,13 @@ func (m *Manager) KVSet(ctx context.Context, manifestID string, installationID i
 	}
 	return runKV(ctx, m, manifestID, installationID, true, func(ctx context.Context) (*KVEntry, error) {
 		client := m.client(ctx)
+		revision := uuid.NewString()
 		create := client.PluginStorage.Create().
 			SetInstallationID(installationID).
 			SetNamespace(namespace).
 			SetKey(key).
 			SetValue(value).
+			SetRevision(revision).
 			SetNillableExpiresAt(expiresAt)
 		if err := create.OnConflictColumns(
 			pluginstorage.FieldInstallationID,
@@ -99,6 +106,7 @@ func (m *Manager) KVSet(ctx context.Context, manifestID string, installationID i
 			pluginstorage.FieldKey,
 		).Update(func(u *ent.PluginStorageUpsert) {
 			u.SetValue(value)
+			u.SetRevision(revision)
 			u.UpdateUpdatedAt()
 			if expiresAt == nil {
 				u.ClearExpiresAt()
@@ -258,7 +266,38 @@ func runKV[T any](ctx context.Context, m *Manager, manifestID string, installati
 			return zero, err
 		}
 	}
-	return authz.RunAsHost(ctx, m.client(ctx), fmt.Sprintf("plugin-kv manifest=%s installation=%d", manifestID, installationID), fn)
+	reason := fmt.Sprintf("plugin-kv manifest=%s installation=%d", manifestID, installationID)
+	if write {
+		var result T
+		err := m.withScheduleWrite(ctx, func(txCtx context.Context) error {
+			var err error
+			result, err = authz.RunAsHost(txCtx, m.client(txCtx), reason, func(hostCtx context.Context) (T, error) {
+				if !identity.IsPlugin(ctx) {
+					return fn(hostCtx)
+				}
+				// The page's pinned write flag may predate a grant change. Serialize
+				// sensitive rule writes with installation updates and re-read grants.
+				call, _ := CallFromContext(ctx)
+				var value T
+				err := m.runInTx(hostCtx, func(guardCtx context.Context) error {
+					row, err := m.client(guardCtx).Plugin.Query().Where(entplugin.IDEQ(installationID), entplugin.PluginIDEQ(manifestID), scheduleRowLock).
+						Select(entplugin.FieldID, entplugin.FieldGrantedPermissions).Only(guardCtx)
+					if err != nil {
+						return err
+					}
+					if slices.Contains(row.GrantedPermissions, objects.PluginPermissionKeySuspensions) && !call.AutomationWritable {
+						return fmt.Errorf("only an owner can change key-suspending plugin data")
+					}
+					value, err = fn(guardCtx)
+					return err
+				})
+				return value, err
+			})
+			return err
+		})
+		return result, err
+	}
+	return authz.RunAsHost(ctx, m.client(ctx), reason, fn)
 }
 
 // authorizePluginKV checks the installation identity bound by the host. The write
@@ -329,6 +368,7 @@ func kvEntryFromRow(row *ent.PluginStorage) KVEntry {
 		Key:       row.Key,
 		Value:     row.Value,
 		UpdatedAt: row.UpdatedAt,
+		Revision:  row.Revision,
 	}
 	if row.ExpiresAt != nil {
 		expiresAt := *row.ExpiresAt

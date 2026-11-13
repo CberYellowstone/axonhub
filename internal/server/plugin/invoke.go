@@ -33,7 +33,7 @@ var (
 )
 
 // InvokeRequest is one call into an installed plugin's named export.
-// Args is a JSON array of values placed before ctx. Nil, empty, or JSON null
+// Args is a JSON array of values placed after ctx. Nil, empty, or JSON null
 // calls the export with only ctx. State nil or JSON null starts at {}.
 // Config nil starts at {}. Timeout bounds JavaScript after a runtime is
 // borrowed and does not include time spent waiting for one. Zero uses ctx
