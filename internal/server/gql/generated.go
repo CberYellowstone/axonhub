@@ -597,6 +597,7 @@ type ComplexityRoot struct {
 		ResponseTimeout             func(childComplexity int) int
 		RetryableErrorPatterns      func(childComplexity int) int
 		RetryableStatusCodes        func(childComplexity int) int
+		SyncModelPrices             func(childComplexity int) int
 		TransformOptions            func(childComplexity int) int
 	}
 
@@ -785,11 +786,12 @@ type ComplexityRoot struct {
 	}
 
 	DisabledAPIKey struct {
-		DisabledAt func(childComplexity int) int
-		ErrorCode  func(childComplexity int) int
-		ExpiresAt  func(childComplexity int) int
-		Key        func(childComplexity int) int
-		Reason     func(childComplexity int) int
+		DisabledAt    func(childComplexity int) int
+		ErrorCode     func(childComplexity int) int
+		ExpiresAt     func(childComplexity int) int
+		Key           func(childComplexity int) int
+		QuotaDisabled func(childComplexity int) int
+		Reason        func(childComplexity int) int
 	}
 
 	ExcludeAssociation struct {
@@ -967,7 +969,8 @@ type ComplexityRoot struct {
 	}
 
 	ModelIdentify struct {
-		ID func(childComplexity int) int
+		ID      func(childComplexity int) int
+		Pricing func(childComplexity int) int
 	}
 
 	ModelIdentityWithStatus struct {
@@ -2264,6 +2267,7 @@ type ComplexityRoot struct {
 	TransformOptions struct {
 		ForceArrayInputs               func(childComplexity int) int
 		ForceArrayInstructions         func(childComplexity int) int
+		ForceArrayStop                 func(childComplexity int) int
 		ReasoningEffortMapping         func(childComplexity int) int
 		ReplaceDeveloperRoleWithSystem func(childComplexity int) int
 	}
@@ -4872,6 +4876,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChannelSettings.RetryableStatusCodes(childComplexity), true
+	case "ChannelSettings.syncModelPrices":
+		if e.complexity.ChannelSettings.SyncModelPrices == nil {
+			break
+		}
+
+		return e.complexity.ChannelSettings.SyncModelPrices(childComplexity), true
 	case "ChannelSettings.transformOptions":
 		if e.complexity.ChannelSettings.TransformOptions == nil {
 			break
@@ -5524,6 +5534,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.DisabledAPIKey.Key(childComplexity), true
+	case "DisabledAPIKey.quotaDisabled":
+		if e.complexity.DisabledAPIKey.QuotaDisabled == nil {
+			break
+		}
+
+		return e.complexity.DisabledAPIKey.QuotaDisabled(childComplexity), true
 	case "DisabledAPIKey.reason":
 		if e.complexity.DisabledAPIKey.Reason == nil {
 			break
@@ -6173,6 +6189,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ModelIdentify.ID(childComplexity), true
+	case "ModelIdentify.pricing":
+		if e.complexity.ModelIdentify.Pricing == nil {
+			break
+		}
+
+		return e.complexity.ModelIdentify.Pricing(childComplexity), true
 
 	case "ModelIdentityWithStatus.id":
 		if e.complexity.ModelIdentityWithStatus.ID == nil {
@@ -12668,6 +12690,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.TransformOptions.ForceArrayInstructions(childComplexity), true
+	case "TransformOptions.forceArrayStop":
+		if e.complexity.TransformOptions.ForceArrayStop == nil {
+			break
+		}
+
+		return e.complexity.TransformOptions.ForceArrayStop(childComplexity), true
 	case "TransformOptions.reasoningEffortMapping":
 		if e.complexity.TransformOptions.ReasoningEffortMapping == nil {
 			break
@@ -23155,6 +23183,8 @@ func (ec *executionContext) fieldContext_Channel_settings(_ context.Context, fie
 				return ec.fieldContext_ChannelSettings_passThroughUserAgent(ctx, field)
 			case "passThroughBody":
 				return ec.fieldContext_ChannelSettings_passThroughBody(ctx, field)
+			case "syncModelPrices":
+				return ec.fieldContext_ChannelSettings_syncModelPrices(ctx, field)
 			case "rateLimit":
 				return ec.fieldContext_ChannelSettings_rateLimit(ctx, field)
 			case "retryableStatusCodes":
@@ -23815,6 +23845,8 @@ func (ec *executionContext) fieldContext_Channel_disabledAPIKeys(_ context.Conte
 				return ec.fieldContext_DisabledAPIKey_reason(ctx, field)
 			case "expiresAt":
 				return ec.fieldContext_DisabledAPIKey_expiresAt(ctx, field)
+			case "quotaDisabled":
+				return ec.fieldContext_DisabledAPIKey_quotaDisabled(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type DisabledAPIKey", field.Name)
 		},
@@ -27811,6 +27843,8 @@ func (ec *executionContext) fieldContext_ChannelSettings_transformOptions(_ cont
 				return ec.fieldContext_TransformOptions_forceArrayInstructions(ctx, field)
 			case "forceArrayInputs":
 				return ec.fieldContext_TransformOptions_forceArrayInputs(ctx, field)
+			case "forceArrayStop":
+				return ec.fieldContext_TransformOptions_forceArrayStop(ctx, field)
 			case "replaceDeveloperRoleWithSystem":
 				return ec.fieldContext_TransformOptions_replaceDeveloperRoleWithSystem(ctx, field)
 			case "reasoningEffortMapping":
@@ -27966,6 +28000,35 @@ func (ec *executionContext) _ChannelSettings_passThroughBody(ctx context.Context
 }
 
 func (ec *executionContext) fieldContext_ChannelSettings_passThroughBody(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChannelSettings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChannelSettings_syncModelPrices(ctx context.Context, field graphql.CollectedField, obj *objects.ChannelSettings) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ChannelSettings_syncModelPrices,
+		func(ctx context.Context) (any, error) {
+			return obj.SyncModelPrices, nil
+		},
+		nil,
+		ec.marshalOBoolean2bool,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ChannelSettings_syncModelPrices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ChannelSettings",
 		Field:      field,
@@ -31518,6 +31581,35 @@ func (ec *executionContext) fieldContext_DisabledAPIKey_expiresAt(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _DisabledAPIKey_quotaDisabled(ctx context.Context, field graphql.CollectedField, obj *objects.DisabledAPIKey) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DisabledAPIKey_quotaDisabled,
+		func(ctx context.Context) (any, error) {
+			return obj.QuotaDisabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DisabledAPIKey_quotaDisabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DisabledAPIKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ExcludeAssociation_channelNamePattern(ctx context.Context, field graphql.CollectedField, obj *objects.ExcludeAssociation) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -32066,6 +32158,8 @@ func (ec *executionContext) fieldContext_FetchModelsPayload_models(_ context.Con
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_ModelIdentify_id(ctx, field)
+			case "pricing":
+				return ec.fieldContext_ModelIdentify_pricing(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ModelIdentify", field.Name)
 		},
@@ -34802,6 +34896,41 @@ func (ec *executionContext) fieldContext_ModelIdentify_id(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelIdentify_pricing(ctx context.Context, field graphql.CollectedField, obj *biz.ModelIdentify) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelIdentify_pricing,
+		func(ctx context.Context) (any, error) {
+			return obj.Pricing, nil
+		},
+		nil,
+		ec.marshalOModelPrice2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐModelPrice,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelIdentify_pricing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelIdentify",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "items":
+				return ec.fieldContext_ModelPrice_items(ctx, field)
+			case "schedule":
+				return ec.fieldContext_ModelPrice_schedule(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelPrice", field.Name)
 		},
 	}
 	return fc, nil
@@ -67893,6 +68022,35 @@ func (ec *executionContext) fieldContext_TransformOptions_forceArrayInputs(_ con
 	return fc, nil
 }
 
+func (ec *executionContext) _TransformOptions_forceArrayStop(ctx context.Context, field graphql.CollectedField, obj *objects.TransformOptions) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TransformOptions_forceArrayStop,
+		func(ctx context.Context) (any, error) {
+			return obj.ForceArrayStop, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TransformOptions_forceArrayStop(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TransformOptions",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _TransformOptions_replaceDeveloperRoleWithSystem(ctx context.Context, field graphql.CollectedField, obj *objects.TransformOptions) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -78984,7 +79142,7 @@ func (ec *executionContext) unmarshalInputChannelSettingsInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"extraModelPrefix", "modelMappings", "autoTrimedModelPrefixes", "hideOriginalModels", "hideMappedModels", "lowercaseModelId", "proxy", "transformOptions", "headerOverrideOperations", "bodyOverrideOperations", "passThroughUserAgent", "passThroughBody", "rateLimit", "retryableStatusCodes", "retryableErrorPatterns", "maxSingleChannelRetries", "responseTimeout", "modelProtocols", "apiKeyStrategy", "apiKeyRoundRobinSwitchAfter", "providerQuota", "quotaRoutingMode"}
+	fieldsInOrder := [...]string{"extraModelPrefix", "modelMappings", "autoTrimedModelPrefixes", "hideOriginalModels", "hideMappedModels", "lowercaseModelId", "proxy", "transformOptions", "headerOverrideOperations", "bodyOverrideOperations", "passThroughUserAgent", "passThroughBody", "syncModelPrices", "rateLimit", "retryableStatusCodes", "retryableErrorPatterns", "maxSingleChannelRetries", "responseTimeout", "modelProtocols", "apiKeyStrategy", "apiKeyRoundRobinSwitchAfter", "providerQuota", "quotaRoutingMode"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -79075,6 +79233,13 @@ func (ec *executionContext) unmarshalInputChannelSettingsInput(ctx context.Conte
 				return it, err
 			}
 			it.PassThroughBody = data
+		case "syncModelPrices":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("syncModelPrices"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SyncModelPrices = data
 		case "rateLimit":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rateLimit"))
 			data, err := ec.unmarshalOChannelRateLimitInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐChannelRateLimit(ctx, v)
@@ -95466,7 +95631,7 @@ func (ec *executionContext) unmarshalInputTransformOptionsInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"forceArrayInstructions", "forceArrayInputs", "replaceDeveloperRoleWithSystem", "reasoningEffortMapping"}
+	fieldsInOrder := [...]string{"forceArrayInstructions", "forceArrayInputs", "forceArrayStop", "replaceDeveloperRoleWithSystem", "reasoningEffortMapping"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -95487,6 +95652,13 @@ func (ec *executionContext) unmarshalInputTransformOptionsInput(ctx context.Cont
 				return it, err
 			}
 			it.ForceArrayInputs = data
+		case "forceArrayStop":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("forceArrayStop"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ForceArrayStop = data
 		case "replaceDeveloperRoleWithSystem":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("replaceDeveloperRoleWithSystem"))
 			data, err := ec.unmarshalOBoolean2bool(ctx, v)
@@ -96272,7 +96444,7 @@ func (ec *executionContext) unmarshalInputUpdateChannelSettingsInput(ctx context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"extraModelPrefix", "modelMappings", "autoTrimedModelPrefixes", "hideOriginalModels", "hideMappedModels", "lowercaseModelId", "proxy", "transformOptions", "headerOverrideOperations", "bodyOverrideOperations", "passThroughUserAgent", "passThroughBody", "rateLimit", "retryableStatusCodes", "retryableErrorPatterns", "modelProtocols", "apiKeyStrategy", "apiKeyRoundRobinSwitchAfter", "providerQuota", "quotaRoutingMode"}
+	fieldsInOrder := [...]string{"extraModelPrefix", "modelMappings", "autoTrimedModelPrefixes", "hideOriginalModels", "hideMappedModels", "lowercaseModelId", "proxy", "transformOptions", "headerOverrideOperations", "bodyOverrideOperations", "passThroughUserAgent", "passThroughBody", "syncModelPrices", "rateLimit", "retryableStatusCodes", "retryableErrorPatterns", "modelProtocols", "apiKeyStrategy", "apiKeyRoundRobinSwitchAfter", "providerQuota", "quotaRoutingMode"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -96363,6 +96535,13 @@ func (ec *executionContext) unmarshalInputUpdateChannelSettingsInput(ctx context
 				return it, err
 			}
 			it.PassThroughBody = data
+		case "syncModelPrices":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("syncModelPrices"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SyncModelPrices = data
 		case "rateLimit":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rateLimit"))
 			data, err := ec.unmarshalOChannelRateLimitInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐChannelRateLimit(ctx, v)
@@ -106648,6 +106827,8 @@ func (ec *executionContext) _ChannelSettings(ctx context.Context, sel ast.Select
 			out.Values[i] = ec._ChannelSettings_passThroughUserAgent(ctx, field, obj)
 		case "passThroughBody":
 			out.Values[i] = ec._ChannelSettings_passThroughBody(ctx, field, obj)
+		case "syncModelPrices":
+			out.Values[i] = ec._ChannelSettings_syncModelPrices(ctx, field, obj)
 		case "rateLimit":
 			out.Values[i] = ec._ChannelSettings_rateLimit(ctx, field, obj)
 		case "retryableStatusCodes":
@@ -108271,6 +108452,11 @@ func (ec *executionContext) _DisabledAPIKey(ctx context.Context, sel ast.Selecti
 			out.Values[i] = ec._DisabledAPIKey_reason(ctx, field, obj)
 		case "expiresAt":
 			out.Values[i] = ec._DisabledAPIKey_expiresAt(ctx, field, obj)
+		case "quotaDisabled":
+			out.Values[i] = ec._DisabledAPIKey_quotaDisabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -109614,6 +109800,8 @@ func (ec *executionContext) _ModelIdentify(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "pricing":
+			out.Values[i] = ec._ModelIdentify_pricing(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -122495,6 +122683,11 @@ func (ec *executionContext) _TransformOptions(ctx context.Context, sel ast.Selec
 			}
 		case "forceArrayInputs":
 			out.Values[i] = ec._TransformOptions_forceArrayInputs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "forceArrayStop":
+			out.Values[i] = ec._TransformOptions_forceArrayStop(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -135714,6 +135907,13 @@ func (ec *executionContext) unmarshalOModelOrder2ᚖgithubᚗcomᚋloopljᚋaxon
 	}
 	res, err := ec.unmarshalInputModelOrder(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOModelPrice2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐModelPrice(ctx context.Context, sel ast.SelectionSet, v *objects.ModelPrice) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ModelPrice(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOModelProtocol2ᚕgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐModelProtocolᚄ(ctx context.Context, sel ast.SelectionSet, v []objects.ModelProtocol) graphql.Marshaler {

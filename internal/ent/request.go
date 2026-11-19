@@ -50,6 +50,8 @@ type Request struct {
 	RequestHeaders objects.JSONRawMessage `json:"request_headers,omitempty"`
 	// RequestBody holds the value of the "request_body" field.
 	RequestBody objects.JSONRawMessage `json:"request_body,omitempty"`
+	// Request body is a manifest referencing project-scoped content chunks
+	RequestBodyChunked bool `json:"request_body_chunked,omitempty"`
 	// Response headers sent to the client, with sensitive values masked
 	ResponseHeaders objects.JSONRawMessage `json:"response_headers,omitempty"`
 	// ResponseBody holds the value of the "response_body" field.
@@ -92,6 +94,8 @@ type Request struct {
 
 // RequestEdges holds the relations/edges for other nodes in the graph.
 type RequestEdges struct {
+	// RequestBodyChunks holds the value of the request_body_chunks edge.
+	RequestBodyChunks []*RequestBodyChunkRef `json:"request_body_chunks,omitempty"`
 	// APIKey holds the value of the api_key edge.
 	APIKey *APIKey `json:"api_key,omitempty"`
 	// Project holds the value of the project edge.
@@ -108,12 +112,22 @@ type RequestEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 	// totalCount holds the count of the edges above.
 	totalCount [7]map[string]int
 
-	namedExecutions map[string][]*RequestExecution
-	namedUsageLogs  map[string][]*UsageLog
+	namedRequestBodyChunks map[string][]*RequestBodyChunkRef
+	namedExecutions        map[string][]*RequestExecution
+	namedUsageLogs         map[string][]*UsageLog
+}
+
+// RequestBodyChunksOrErr returns the RequestBodyChunks value or an error if the edge
+// was not loaded in eager-loading.
+func (e RequestEdges) RequestBodyChunksOrErr() ([]*RequestBodyChunkRef, error) {
+	if e.loadedTypes[0] {
+		return e.RequestBodyChunks, nil
+	}
+	return nil, &NotLoadedError{edge: "request_body_chunks"}
 }
 
 // APIKeyOrErr returns the APIKey value or an error if the edge
@@ -121,7 +135,7 @@ type RequestEdges struct {
 func (e RequestEdges) APIKeyOrErr() (*APIKey, error) {
 	if e.APIKey != nil {
 		return e.APIKey, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[1] {
 		return nil, &NotFoundError{label: apikey.Label}
 	}
 	return nil, &NotLoadedError{edge: "api_key"}
@@ -132,7 +146,7 @@ func (e RequestEdges) APIKeyOrErr() (*APIKey, error) {
 func (e RequestEdges) ProjectOrErr() (*Project, error) {
 	if e.Project != nil {
 		return e.Project, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: project.Label}
 	}
 	return nil, &NotLoadedError{edge: "project"}
@@ -143,7 +157,7 @@ func (e RequestEdges) ProjectOrErr() (*Project, error) {
 func (e RequestEdges) TraceOrErr() (*Trace, error) {
 	if e.Trace != nil {
 		return e.Trace, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: trace.Label}
 	}
 	return nil, &NotLoadedError{edge: "trace"}
@@ -154,7 +168,7 @@ func (e RequestEdges) TraceOrErr() (*Trace, error) {
 func (e RequestEdges) DataStorageOrErr() (*DataStorage, error) {
 	if e.DataStorage != nil {
 		return e.DataStorage, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: datastorage.Label}
 	}
 	return nil, &NotLoadedError{edge: "data_storage"}
@@ -163,7 +177,7 @@ func (e RequestEdges) DataStorageOrErr() (*DataStorage, error) {
 // ExecutionsOrErr returns the Executions value or an error if the edge
 // was not loaded in eager-loading.
 func (e RequestEdges) ExecutionsOrErr() ([]*RequestExecution, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.Executions, nil
 	}
 	return nil, &NotLoadedError{edge: "executions"}
@@ -174,7 +188,7 @@ func (e RequestEdges) ExecutionsOrErr() ([]*RequestExecution, error) {
 func (e RequestEdges) ChannelOrErr() (*Channel, error) {
 	if e.Channel != nil {
 		return e.Channel, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: channel.Label}
 	}
 	return nil, &NotLoadedError{edge: "channel"}
@@ -183,7 +197,7 @@ func (e RequestEdges) ChannelOrErr() (*Channel, error) {
 // UsageLogsOrErr returns the UsageLogs value or an error if the edge
 // was not loaded in eager-loading.
 func (e RequestEdges) UsageLogsOrErr() ([]*UsageLog, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.UsageLogs, nil
 	}
 	return nil, &NotLoadedError{edge: "usage_logs"}
@@ -196,7 +210,7 @@ func (*Request) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case request.FieldRequestHeaders, request.FieldRequestBody, request.FieldResponseHeaders, request.FieldResponseBody, request.FieldResponseChunks:
 			values[i] = new([]byte)
-		case request.FieldStream, request.FieldContentSaved:
+		case request.FieldRequestBodyChunked, request.FieldStream, request.FieldContentSaved:
 			values[i] = new(sql.NullBool)
 		case request.FieldID, request.FieldAPIKeyID, request.FieldUserID, request.FieldProjectID, request.FieldTraceID, request.FieldDataStorageID, request.FieldChannelID, request.FieldMetricsLatencyMs, request.FieldMetricsFirstTokenLatencyMs, request.FieldMetricsReasoningDurationMs, request.FieldContentStorageID:
 			values[i] = new(sql.NullInt64)
@@ -307,6 +321,12 @@ func (_m *Request) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.RequestBody); err != nil {
 					return fmt.Errorf("unmarshal field request_body: %w", err)
 				}
+			}
+		case request.FieldRequestBodyChunked:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field request_body_chunked", values[i])
+			} else if value.Valid {
+				_m.RequestBodyChunked = value.Bool
 			}
 		case request.FieldResponseHeaders:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -436,6 +456,11 @@ func (_m *Request) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryRequestBodyChunks queries the "request_body_chunks" edge of the Request entity.
+func (_m *Request) QueryRequestBodyChunks() *RequestBodyChunkRefQuery {
+	return NewRequestClient(_m.config).QueryRequestBodyChunks(_m)
+}
+
 // QueryAPIKey queries the "api_key" edge of the Request entity.
 func (_m *Request) QueryAPIKey() *APIKeyQuery {
 	return NewRequestClient(_m.config).QueryAPIKey(_m)
@@ -535,6 +560,9 @@ func (_m *Request) String() string {
 	builder.WriteString("request_body=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequestBody))
 	builder.WriteString(", ")
+	builder.WriteString("request_body_chunked=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RequestBodyChunked))
+	builder.WriteString(", ")
 	builder.WriteString("response_headers=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ResponseHeaders))
 	builder.WriteString(", ")
@@ -601,6 +629,30 @@ func (_m *Request) String() string {
 	}
 	builder.WriteByte(')')
 	return builder.String()
+}
+
+// NamedRequestBodyChunks returns the RequestBodyChunks named value or an error if the edge was not
+// loaded in eager-loading with this name.
+func (_m *Request) NamedRequestBodyChunks(name string) ([]*RequestBodyChunkRef, error) {
+	if _m.Edges.namedRequestBodyChunks == nil {
+		return nil, &NotLoadedError{edge: name}
+	}
+	nodes, ok := _m.Edges.namedRequestBodyChunks[name]
+	if !ok {
+		return nil, &NotLoadedError{edge: name}
+	}
+	return nodes, nil
+}
+
+func (_m *Request) appendNamedRequestBodyChunks(name string, edges ...*RequestBodyChunkRef) {
+	if _m.Edges.namedRequestBodyChunks == nil {
+		_m.Edges.namedRequestBodyChunks = make(map[string][]*RequestBodyChunkRef)
+	}
+	if len(edges) == 0 {
+		_m.Edges.namedRequestBodyChunks[name] = []*RequestBodyChunkRef{}
+	} else {
+		_m.Edges.namedRequestBodyChunks[name] = append(_m.Edges.namedRequestBodyChunks[name], edges...)
+	}
 }
 
 // NamedExecutions returns the Executions named value or an error if the edge was not

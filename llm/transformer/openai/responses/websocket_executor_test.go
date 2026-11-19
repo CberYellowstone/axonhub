@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,9 +16,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/looplj/axonhub/llm"
 	"github.com/looplj/axonhub/llm/auth"
 	"github.com/looplj/axonhub/llm/httpclient"
 	"github.com/looplj/axonhub/llm/transformer/shared"
@@ -265,7 +268,18 @@ func TestWebSocketExecutorDoReturnsErrorForTopLevelErrorEvent(t *testing.T) {
 	})
 
 	require.Nil(t, resp)
-	require.ErrorContains(t, err, "bad_request: invalid websocket request")
+
+	var httpErr *httpclient.Error
+	require.ErrorAs(t, err, &httpErr)
+	require.Equal(t, http.StatusBadGateway, httpErr.StatusCode)
+	require.True(t, httpclient.IsHTTPStatusCodeRetryable(httpErr.StatusCode))
+	require.JSONEq(t, `{
+		"error":{
+			"type":"bad_request",
+			"code":"bad_request",
+			"message":"invalid websocket request"
+		}
+	}`, string(httpErr.Body))
 }
 
 func TestTopLevelWebSocketErrorPreservesOfficialErrorStatusAndBody(t *testing.T) {
@@ -345,7 +359,119 @@ func TestTopLevelWebSocketErrorPreservesOfficialErrorStatusAndBody(t *testing.T)
 			var httpErr *httpclient.Error
 			require.ErrorAs(t, err, &httpErr)
 			require.Equal(t, http.StatusBadRequest, httpErr.StatusCode)
+			require.False(t, httpclient.IsHTTPStatusCodeRetryable(httpErr.StatusCode))
 			require.JSONEq(t, tt.want, string(httpErr.Body))
+		})
+	}
+}
+
+func TestTopLevelWebSocketErrorReportsProviderFailure(t *testing.T) {
+	tests := []struct {
+		name        string
+		data        string
+		wantStatus  int
+		wantBody    string
+		wantContain []string
+	}{
+		{
+			name:       "string status and numeric code decode leniently",
+			data:       `{"type":"error","status":"503","code":503,"message":"upstream overloaded"}`,
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody: `{
+				"error":{
+					"type":"upstream_error",
+					"code":"503",
+					"message":"upstream overloaded"
+				}
+			}`,
+		},
+		{
+			name:       "fractional status is not a usable status",
+			data:       `{"type":"error","status":400.9,"message":"fractional status"}`,
+			wantStatus: http.StatusBadGateway,
+			wantBody: `{
+				"error":{
+					"type":"upstream_error",
+					"message":"fractional status"
+				}
+			}`,
+		},
+		{
+			name:       "status-less frame keeps code and message",
+			data:       `{"type":"error","code":"server_error","message":"upstream failed"}`,
+			wantStatus: http.StatusBadGateway,
+			wantBody: `{
+				"error":{
+					"type":"server_error",
+					"code":"server_error",
+					"message":"upstream failed"
+				}
+			}`,
+		},
+		{
+			name:       "nested-only frame keeps nested detail",
+			data:       `{"type":"error","error":{"type":"server_error","code":"overloaded","message":"try later"}}`,
+			wantStatus: http.StatusBadGateway,
+			wantBody: `{
+				"error":{
+					"type":"server_error",
+					"code":"overloaded",
+					"message":"try later"
+				}
+			}`,
+		},
+		{
+			name:       "nested symbolic code supplies the type",
+			data:       `{"type":"error","error":{"code":"server_error","message":"try later"}}`,
+			wantStatus: http.StatusBadGateway,
+			wantBody: `{
+				"error":{
+					"type":"server_error",
+					"code":"server_error",
+					"message":"try later"
+				}
+			}`,
+		},
+		{
+			name:        "empty nested detail falls back to the raw frame",
+			data:        `{"type":"error","error":{"type":"server_error","code":"","message":""}}`,
+			wantStatus:  http.StatusBadGateway,
+			wantContain: []string{`"type":"server_error"`, `"message":"websocket error event: {\"type\":\"error\"`},
+		},
+		{
+			name:        "frame without detail falls back to the raw frame",
+			data:        `{"type":"error"}`,
+			wantStatus:  http.StatusBadGateway,
+			wantContain: []string{`"type":"upstream_error"`, `websocket error event: {\"type\":\"error\"}`},
+		},
+		{
+			name:        "malformed frame keeps the decode error and raw frame",
+			data:        `{"type":"error",`,
+			wantStatus:  http.StatusBadGateway,
+			wantContain: []string{`"type":"upstream_error"`, `failed to decode error frame`, `{\"type\":\"error\",`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := TopLevelWebSocketError([]*httpclient.StreamEvent{{
+				Type: "error",
+				Data: []byte(tt.data),
+			}})
+
+			var httpErr *httpclient.Error
+			require.ErrorAs(t, err, &httpErr)
+			require.Equal(t, tt.wantStatus, httpErr.StatusCode)
+			require.True(t, httpclient.IsHTTPStatusCodeRetryable(httpErr.StatusCode),
+				"an unclassified upstream error frame must be retryable")
+
+			if tt.wantBody != "" {
+				require.JSONEq(t, tt.wantBody, string(httpErr.Body))
+			}
+
+			for _, want := range tt.wantContain {
+				require.Contains(t, string(httpErr.Body), want)
+			}
 		})
 	}
 }
@@ -771,6 +897,140 @@ func TestPrepareWebSocketPayloadChecksExplicitPreviousIDWithEmptyCachedInput(t *
 
 	err := prepareWebSocketPayloadForLease(payload, lease)
 	require.ErrorIs(t, err, shared.ErrResponsesContinuationUnavailable)
+}
+
+// TestPrepareWebSocketPayloadKeepsJSONObjectReminderStable pins the review
+// finding on #3004: the json_object reminder must keep the same position on
+// every turn, or the input prefix check rejects reuse and the next turn opens
+// a new WebSocket with the full history.
+func TestPrepareWebSocketPayloadKeepsJSONObjectReminderStable(t *testing.T) {
+	transformer, err := NewOutboundTransformer("https://api.openai.com", "test-api-key")
+	require.NoError(t, err)
+
+	systemMessage := llm.Message{
+		Role:    "system",
+		Content: llm.MessageContent{Content: lo.ToPtr("Return a json object.")},
+	}
+	userMessage := func(text string) llm.Message {
+		return llm.Message{
+			Role:    "user",
+			Content: llm.MessageContent{Content: lo.ToPtr(text)},
+		}
+	}
+	assistantMessage := llm.Message{
+		Role:    "assistant",
+		Content: llm.MessageContent{Content: lo.ToPtr(`{"name":"Ada"}`)},
+	}
+
+	payloadFor := func(msgs []llm.Message) map[string]any {
+		hreq, err := transformer.TransformRequest(context.Background(), &llm.Request{
+			Model:          "gpt-5",
+			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+			Messages:       msgs,
+		})
+		require.NoError(t, err)
+
+		payload, err := buildWebSocketCreatePayload(hreq.Body)
+		require.NoError(t, err)
+
+		return payload
+	}
+
+	firstPayload := payloadFor([]llm.Message{systemMessage, userMessage("Ada Lovelace, 36")})
+
+	pooled := &pooledWebSocketConn{}
+	firstLease := &webSocketLease{pooled: pooled}
+	require.NoError(t, prepareWebSocketPayloadForLease(firstPayload, firstLease))
+
+	output := make([]json.RawMessage, 0)
+	for _, item := range convertAssistantMessage(assistantMessage) {
+		raw, err := json.Marshal(item)
+		require.NoError(t, err)
+
+		output = append(output, raw)
+	}
+
+	require.True(t, firstLease.rememberTurn("resp_1", output))
+
+	secondPayload := payloadFor([]llm.Message{
+		systemMessage, userMessage("Ada Lovelace, 36"), assistantMessage, userMessage("Lovelace, 36"),
+	})
+	secondLease := &webSocketLease{pooled: pooled, reused: true}
+	require.NoError(t, prepareWebSocketPayloadForLease(secondPayload, secondLease))
+
+	input, ok, err := payloadInputItems(secondPayload)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Len(t, input, 1)
+	require.Contains(t, string(input[0]), "Lovelace, 36")
+	require.Equal(t, "resp_1", secondPayload["previous_response_id"])
+}
+
+// regression for #3005: an assistant response that contains "json" (for
+// example explanatory prose alongside JSON output) must not suppress the
+// json_object reminder on the next turn, or the saved input stops being a
+// prefix of the new one and the pooled WebSocket executor rejects reuse.
+func TestPrepareWebSocketPayloadKeepsJSONObjectReminderStableAfterAssistantMentionsJSON(t *testing.T) {
+	transformer, err := NewOutboundTransformer("https://api.openai.com", "test-api-key")
+	require.NoError(t, err)
+
+	systemMessage := llm.Message{
+		Role:    "system",
+		Content: llm.MessageContent{Content: lo.ToPtr("Return a json object.")},
+	}
+	userMessage := func(text string) llm.Message {
+		return llm.Message{
+			Role:    "user",
+			Content: llm.MessageContent{Content: lo.ToPtr(text)},
+		}
+	}
+	assistantMessage := llm.Message{
+		Role:    "assistant",
+		Content: llm.MessageContent{Content: lo.ToPtr(`Here is the JSON: {"name":"Ada"}`)},
+	}
+
+	payloadFor := func(msgs []llm.Message) map[string]any {
+		hreq, err := transformer.TransformRequest(context.Background(), &llm.Request{
+			Model:          "gpt-5",
+			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+			Messages:       msgs,
+		})
+		require.NoError(t, err)
+
+		payload, err := buildWebSocketCreatePayload(hreq.Body)
+		require.NoError(t, err)
+
+		return payload
+	}
+
+	firstPayload := payloadFor([]llm.Message{systemMessage, userMessage("Ada Lovelace, 36")})
+
+	pooled := &pooledWebSocketConn{}
+	firstLease := &webSocketLease{pooled: pooled}
+	require.NoError(t, prepareWebSocketPayloadForLease(firstPayload, firstLease))
+
+	output := make([]json.RawMessage, 0)
+	for _, item := range convertAssistantMessage(assistantMessage) {
+		raw, err := json.Marshal(item)
+		require.NoError(t, err)
+
+		output = append(output, raw)
+	}
+
+	require.True(t, firstLease.rememberTurn("resp_1", output))
+
+	secondPayload := payloadFor([]llm.Message{
+		systemMessage, userMessage("Ada Lovelace, 36"), assistantMessage, userMessage("Lovelace, 36"),
+	})
+	secondLease := &webSocketLease{pooled: pooled, reused: true}
+	require.NoError(t, prepareWebSocketPayloadForLease(secondPayload, secondLease))
+
+	input, ok, err := payloadInputItems(secondPayload)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Len(t, input, 1)
+	require.Contains(t, string(input[0]), "Lovelace, 36")
+	require.Equal(t, "resp_1", secondPayload["previous_response_id"])
 }
 
 func TestRestorePayloadMapRestoresMutatedPayload(t *testing.T) {
@@ -1673,4 +1933,215 @@ func TestWebSocketExecutorObservesHandshakeHeaders(t *testing.T) {
 	}
 	require.NoError(t, stream.Err())
 	require.Equal(t, 1, observed)
+}
+
+func TestWebSocketExecutorStreamIdleTimeout(t *testing.T) {
+	for _, heartbeat := range []bool{false, true} {
+		t.Run(fmt.Sprintf("heartbeat=%t", heartbeat), func(t *testing.T) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+				require.NoError(t, err)
+				defer conn.Close()
+				_, _, err = conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				if heartbeat {
+					for range 6 {
+						time.Sleep(25 * time.Millisecond)
+						if err := conn.WriteControl(websocket.PingMessage, []byte("upstream heartbeat"), time.Now().Add(time.Second)); err != nil {
+							return
+						}
+					}
+					if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.output_text.delta","delta":"alive"}`)); err != nil {
+						return
+					}
+				}
+				// Read until the client's watchdog closes this connection, also
+				// consuming pong frames generated by the client's ping handler.
+				_, _, _ = conn.ReadMessage()
+			}))
+			defer server.Close()
+			executor := NewWebSocketExecutor(httpclient.NewHttpClientWithClient(server.Client()))
+			defer executor.Close()
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			stream, err := executor.DoStream(httpclient.WithStreamIdleTimeout(ctx, 100*time.Millisecond), &httpclient.Request{
+				Method: http.MethodPost, URL: server.URL, Body: []byte(`{"model":"test"}`),
+			})
+			require.NoError(t, err)
+			defer stream.Close()
+			if heartbeat {
+				require.True(t, stream.Next(), "upstream control frames must reset the watchdog")
+			}
+			require.False(t, stream.Next())
+			require.ErrorIs(t, stream.Err(), httpclient.ErrStreamIdleTimeout)
+			require.NotErrorIs(t, stream.Err(), context.Canceled)
+		})
+	}
+}
+
+func TestWebSocketExecutorStreamIdleTimeoutDuringHandshake(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	executor := NewWebSocketExecutor(httpclient.NewHttpClient())
+	defer executor.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	_, err := executor.DoStream(httpclient.WithStreamIdleTimeout(ctx, 50*time.Millisecond), &httpclient.Request{
+		Method: http.MethodPost, URL: server.URL, Body: []byte(`{"model":"test"}`),
+	})
+	require.ErrorIs(t, err, httpclient.ErrStreamIdleTimeout)
+}
+
+func TestWebSocketExecutorIdleTimeoutExcludesPoolQueue(t *testing.T) {
+	releaseFirst := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		require.NoError(t, err)
+		defer conn.Close()
+		for i := range 2 {
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			if i == 0 {
+				<-releaseFirst
+			}
+			if err := conn.WriteJSON(map[string]any{
+				"type":     "response.completed",
+				"response": map[string]any{"id": fmt.Sprintf("resp_%d", i), "status": "completed", "output": []any{}},
+			}); err != nil {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+	defer func() {
+		select {
+		case <-releaseFirst:
+		default:
+			close(releaseFirst)
+		}
+	}()
+	executor := NewWebSocketExecutor(httpclient.NewHttpClientWithClient(server.Client()))
+	defer executor.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	ctx = shared.WithSessionScope(ctx, "test-scope")
+	request := func() *httpclient.Request {
+		return &httpclient.Request{
+			Method: http.MethodPost, URL: server.URL, Body: []byte(`{"model":"test"}`),
+			Headers: http.Header{webSocketSessionHeader: []string{"idle-queue-session"}},
+		}
+	}
+	first, err := executor.DoStream(ctx, request())
+	require.NoError(t, err)
+	defer first.Close()
+	type result struct {
+		stream httpclient.StreamDecoder
+		err    error
+	}
+	secondResult := make(chan result, 1)
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				t.Errorf("queued upstream attempt panicked: %v", recovered)
+			}
+		}()
+		stream, err := executor.DoStream(httpclient.WithStreamIdleTimeout(ctx, 100*time.Millisecond), request())
+		secondResult <- result{stream: stream, err: err}
+	}()
+	select {
+	case queued := <-secondResult:
+		t.Fatalf("queued request completed before lease release: %v", queued.err)
+	case <-time.After(150 * time.Millisecond):
+	}
+	close(releaseFirst)
+	require.True(t, first.Next())
+	require.False(t, first.Next())
+	require.NoError(t, first.Err())
+	select {
+	case queued := <-secondResult:
+		require.NoError(t, queued.err)
+		defer queued.stream.Close()
+		require.True(t, queued.stream.Next())
+		require.False(t, queued.stream.Next())
+		require.NoError(t, queued.stream.Err())
+	case <-ctx.Done():
+		t.Fatal("queued attempt did not acquire released lease")
+	}
+}
+
+func TestWebSocketExecutorIdleTimeoutExcludesConsumerDelay(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		require.NoError(t, err)
+		defer conn.Close()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.output_text.delta","delta":"first"}`)); err != nil {
+			return
+		}
+		<-release
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.output_text.delta","delta":"second"}`))
+		_, _, _ = conn.ReadMessage()
+	}))
+	defer server.Close()
+	defer func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}()
+	executor := NewWebSocketExecutor(httpclient.NewHttpClientWithClient(server.Client()))
+	defer executor.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	stream, err := executor.DoStream(httpclient.WithStreamIdleTimeout(ctx, 50*time.Millisecond), &httpclient.Request{
+		Method: http.MethodPost, URL: server.URL, Body: []byte(`{"model":"test"}`),
+	})
+	require.NoError(t, err)
+	defer stream.Close()
+	time.Sleep(120 * time.Millisecond)
+	require.True(t, stream.Next())
+	require.Contains(t, string(stream.Current().Data), "first")
+	time.Sleep(120 * time.Millisecond)
+	close(release)
+	require.True(t, stream.Next())
+	require.Contains(t, string(stream.Current().Data), "second")
+	require.False(t, stream.Next(), "resuming reads must restore idle timeout enforcement")
+	require.ErrorIs(t, stream.Err(), httpclient.ErrStreamIdleTimeout)
+}
+
+func TestWebSocketExecutorParentCustomCause(t *testing.T) {
+	for _, timeout := range []time.Duration{0, time.Second} {
+		t.Run(timeout.String(), func(t *testing.T) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+				require.NoError(t, err)
+				defer conn.Close()
+				_, _, _ = conn.ReadMessage()
+				_, _, _ = conn.ReadMessage()
+			}))
+			defer server.Close()
+			executor := NewWebSocketExecutor(httpclient.NewHttpClientWithClient(server.Client()))
+			defer executor.Close()
+			ctx, cancel := context.WithCancelCause(t.Context())
+			defer cancel(nil)
+			stream, err := executor.DoStream(httpclient.WithStreamIdleTimeout(ctx, timeout), &httpclient.Request{
+				Method: http.MethodPost, URL: server.URL, Body: []byte(`{"model":"test"}`),
+			})
+			require.NoError(t, err)
+			defer stream.Close()
+			cancel(errors.New("caller-specific cause"))
+			require.False(t, stream.Next())
+			require.ErrorIs(t, stream.Err(), context.Canceled)
+		})
+	}
 }
