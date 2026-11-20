@@ -3,6 +3,7 @@
 //
 //	internal/ent/schema/usage_log.go
 //	internal/ent/schema/request.go
+//	internal/server/biz/plugin_usage_metrics_batch.go
 //	internal/server/biz/usage_log.go
 //	internal/server/orchestrator/events.go
 //
@@ -135,6 +136,17 @@ func QueryCacheUsage(ctx context.Context, client *ent.Client, query CacheUsageQu
 		selected = selected[:q.Limit]
 		page.NextAfterKeyID = selected[len(selected)-1].ID
 	}
+	if len(selected) == 0 {
+		return page, nil
+	}
+	if canBatchCacheUsage(ctx, client.Driver().Dialect()) {
+		page.Items, err = queryCacheUsageBatch(ctx, client, q, selected)
+		if err != nil {
+			return CacheUsagePage{}, fmt.Errorf("query cache usage batch: %w", err)
+		}
+		return page, nil
+	}
+	// Other callers must retain Ent's Request and UsageLog privacy checks.
 	for _, key := range selected {
 		item, err := queryCacheKeyUsage(ctx, client, q, key.ID)
 		if err != nil {
@@ -203,7 +215,6 @@ func normalizeCacheUsageQuery(q CacheUsageQuery) (CacheUsageQuery, error) {
 	if q.End.IsZero() {
 		q.End = time.Now().UTC()
 	}
-	q.End = q.End.UTC()
 	q.End = q.End.UTC()
 	return q, nil
 }
@@ -322,17 +333,10 @@ func queryCacheKeyUsage(ctx context.Context, client *ent.Client, q CacheUsageQue
 		item.InvalidCount = item.Count - item.UnknownCount - item.ValidCount
 	}
 	{
-		limit := q.LastRequests
-		if limit == 0 {
-			limit = 1 // Always expose the newest evidence IDs, not only when samples are requested.
-			if q.IncludeSamples || q.LowThreshold != nil {
-				limit = MaxCacheUsageRequests
-			}
-		}
 		rows, err := requests.Clone().Order(func(s *sql.Selector) {
 			s.OrderExpr(sql.Expr("COALESCE(" + s.C(request.FieldCompletedAt) + ", " + s.C(request.FieldCreatedAt) + ") DESC"))
 		}, request.ByID(sql.OrderDesc())).
-			Limit(limit).Select(request.FieldID, request.FieldCompletedAt, request.FieldCreatedAt).All(ctx)
+			Limit(cacheUsageRecentLimit(q)).Select(request.FieldID, request.FieldCompletedAt, request.FieldCreatedAt).All(ctx)
 		if err != nil {
 			return item, err
 		}
@@ -360,37 +364,58 @@ func queryCacheKeyUsage(ctx context.Context, client *ent.Client, q CacheUsageQue
 		}
 		trailing := true
 		for _, row := range rows {
-			sample := cacheSample(row, usageByRequest[row.ID])
-			if q.LastRequests > 0 {
-				item.Count++
-				switch {
-				case sample.Status != llm.CacheReadReported:
-					item.UnknownCount++
-				case sample.CacheRate == nil:
-					item.InvalidCount++
-				default:
-					item.ValidCount++
-					if sample.PromptTokens > math.MaxInt64-item.PromptTokens || sample.CachedTokens > math.MaxInt64-item.CachedTokens {
-						return item, fmt.Errorf("cache token aggregate exceeds int64")
-					}
-					item.PromptTokens += sample.PromptTokens
-					item.CachedTokens += sample.CachedTokens
-				}
-			}
-			if q.LowThreshold != nil && trailing {
-				if sample.CacheRate != nil && *sample.CacheRate < *q.LowThreshold {
-					item.TrailingLowCount++
-				} else {
-					trailing = false
-				}
-			}
-			if q.IncludeSamples {
-				item.Samples = append(item.Samples, sample)
+			if err := addCacheUsageSample(q, &item, cacheSample(row, usageByRequest[row.ID]), &trailing); err != nil {
+				return item, err
 			}
 		}
-		item.SamplesTruncated = q.IncludeSamples && item.Count > int64(len(rows))
-		item.TrailingTruncated = q.LowThreshold != nil && trailing && item.Count > int64(len(rows))
+		finishCacheKeyUsage(q, &item, len(rows), trailing)
 	}
+	return item, nil
+}
+
+func cacheUsageRecentLimit(q CacheUsageQuery) int {
+	if q.LastRequests > 0 {
+		return q.LastRequests
+	}
+	if q.IncludeSamples || q.LowThreshold != nil {
+		return MaxCacheUsageRequests
+	}
+	return 1 // Always expose the newest evidence IDs.
+}
+
+func addCacheUsageSample(q CacheUsageQuery, item *CacheKeyUsage, sample CacheUsageSample, trailing *bool) error {
+	if q.LastRequests > 0 {
+		item.Count++
+		switch {
+		case sample.Status != llm.CacheReadReported:
+			item.UnknownCount++
+		case sample.CacheRate == nil:
+			item.InvalidCount++
+		default:
+			item.ValidCount++
+			if sample.PromptTokens > math.MaxInt64-item.PromptTokens || sample.CachedTokens > math.MaxInt64-item.CachedTokens {
+				return fmt.Errorf("cache token aggregate exceeds int64")
+			}
+			item.PromptTokens += sample.PromptTokens
+			item.CachedTokens += sample.CachedTokens
+		}
+	}
+	if q.LowThreshold != nil && *trailing {
+		if sample.CacheRate != nil && *sample.CacheRate < *q.LowThreshold {
+			item.TrailingLowCount++
+		} else {
+			*trailing = false
+		}
+	}
+	if q.IncludeSamples {
+		item.Samples = append(item.Samples, sample)
+	}
+	return nil
+}
+
+func finishCacheKeyUsage(q CacheUsageQuery, item *CacheKeyUsage, sampleCount int, trailing bool) {
+	item.SamplesTruncated = q.IncludeSamples && item.Count > int64(sampleCount)
+	item.TrailingTruncated = q.LowThreshold != nil && trailing && item.Count > int64(sampleCount)
 	if item.PromptTokens > 0 {
 		rate := float64(item.CachedTokens) / float64(item.PromptTokens)
 		item.CacheRate = &rate
@@ -398,7 +423,6 @@ func queryCacheKeyUsage(ctx context.Context, client *ent.Client, q CacheUsageQue
 	item.EnoughSamples = item.ValidCount >= int64(q.MinSamples)
 	item.SampleComplete = item.EnoughSamples && item.UnknownCount == 0 && item.InvalidCount == 0 &&
 		(q.LastRequests == 0 || item.Count == int64(q.LastRequests))
-	return item, nil
 }
 
 func cacheSample(req *ent.Request, row *ent.UsageLog) CacheUsageSample {
